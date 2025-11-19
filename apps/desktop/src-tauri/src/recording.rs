@@ -73,10 +73,10 @@ pub struct InProgressRecordingCommon {
 pub enum InProgressRecording {
     Instant {
         handle: instant_recording::ActorHandle,
-        progressive_upload: InstantMultipartUpload,
+        display_upload: InstantMultipartUpload,
+        camera_upload: Option<InstantMultipartUpload>,
         video_upload_info: VideoUploadInfo,
         common: InProgressRecordingCommon,
-        // camera isn't used as part of recording pipeline so we hold lock here
         camera_feed: Option<Arc<CameraFeedLock>>,
     },
     Studio {
@@ -700,6 +700,12 @@ pub async fn start_recording(
                                 inputs.capture_target.clone(),
                             )
                             .with_system_audio(inputs.capture_system_audio)
+                            .with_custom_cursor(
+                                general_settings
+                                    .as_ref()
+                                    .map(|s| s.custom_cursor_capture)
+                                    .unwrap_or_default(),
+                            )
                             .with_max_output_size(
                                 general_settings
                                     .as_ref()
@@ -710,6 +716,10 @@ pub async fn start_recording(
                             #[cfg(target_os = "macos")]
                             {
                                 builder = builder.with_excluded_windows(excluded_windows.clone());
+                            }
+
+                            if let Some(camera_feed) = camera_feed.clone() {
+                                builder = builder.with_camera_feed(camera_feed);
                             }
 
                             if let Some(mic_feed) = mic_feed.clone() {
@@ -727,18 +737,32 @@ pub async fn start_recording(
                                     e
                                 })?;
 
-                            let progressive_upload = InstantMultipartUpload::spawn(
+                            let display_upload = InstantMultipartUpload::spawn(
                                 app_handle.clone(),
-                                recording_dir.join("content/output.mp4"),
+                                recording_dir.join("content/display.mp4"),
                                 video_upload_info.clone(),
                                 "display.mp4".to_string(),
                                 recording_dir.clone(),
                                 Some(finish_upload_rx.clone()),
                             );
 
+                            let camera_upload = if camera_feed.is_some() {
+                                Some(InstantMultipartUpload::spawn(
+                                    app_handle.clone(),
+                                    recording_dir.join("content/camera.mp4"),
+                                    video_upload_info.clone(),
+                                    "camera.mp4".to_string(),
+                                    recording_dir.clone(),
+                                    None,
+                                ))
+                            } else {
+                                None
+                            };
+
                             Ok(InProgressRecording::Instant {
                                 handle,
-                                progressive_upload,
+                                display_upload,
+                                camera_upload,
                                 video_upload_info,
                                 common: common.clone(),
                                 camera_feed: camera_feed.clone(),

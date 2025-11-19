@@ -645,6 +645,10 @@ pub async fn start_recording(
                 let actor_result: Result<InProgressRecording, anyhow::Error> = async {
                     match inputs.mode {
                         RecordingMode::Studio => {
+                            let Some(video_upload_info) = video_upload_info.clone() else {
+                                return Err(anyhow!("Video upload info not found"));
+                            };
+
                             let mut builder = studio_recording::Actor::builder(
                                 recording_dir.clone(),
                                 inputs.capture_target.clone(),
@@ -727,6 +731,7 @@ pub async fn start_recording(
                                 app_handle.clone(),
                                 recording_dir.join("content/output.mp4"),
                                 video_upload_info.clone(),
+                                "display.mp4".to_string(),
                                 recording_dir.clone(),
                                 Some(finish_upload_rx.clone()),
                             );
@@ -1351,7 +1356,7 @@ async fn handle_recording_finish(
                                     app.clone(),
                                     crate::api::PresignedS3PutRequest {
                                         video_id: video_upload_info.id.clone(),
-                                        subpath: "screenshot/screen-capture.jpg".to_string(),
+                                        subpath: "screenshot.jpg".to_string(),
                                         method: PresignedS3PutRequestMethod::Put,
                                         meta: None,
                                     },

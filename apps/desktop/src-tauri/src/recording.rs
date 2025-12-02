@@ -645,10 +645,6 @@ pub async fn start_recording(
                 let actor_result: Result<InProgressRecording, anyhow::Error> = async {
                     match inputs.mode {
                         RecordingMode::Studio => {
-                            let Some(video_upload_info) = video_upload_info.clone() else {
-                                return Err(anyhow!("Video upload info not found"));
-                            };
-
                             let mut builder = studio_recording::Actor::builder(
                                 recording_dir.clone(),
                                 inputs.capture_target.clone(),

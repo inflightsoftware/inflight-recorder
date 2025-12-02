@@ -77,7 +77,14 @@ jobs:
           version: 2.2.0
 
       - name: Run Biome
-        run: biome ci . --linter-enabled=false
+        run: |
+          set -e
+          if ! biome format --check . ; then
+            echo "❌ Formatting errors detected by Biome."
+            echo "Run the following locally to fix them and push the result:"
+            echo "  pnpm dlx biome format ."
+            exit 1
+          fi
 
   format-rust:
     name: Format (Cargo)

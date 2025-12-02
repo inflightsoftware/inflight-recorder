@@ -443,8 +443,9 @@ pub async fn start_recording(
                         config: s3_config,
                     })
                 }
+                // Allow the recording to proceed without error for any signed-in user
                 _ => {
-                    // User is not signed in - both modes require authentication now
+                    // User is not signed in
                     return Err("Please sign in to use instant recording".to_string());
                 }
             }

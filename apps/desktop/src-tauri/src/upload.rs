@@ -106,8 +106,15 @@ pub async fn upload_video(
             .map_err(|e| error!("Failed to get video metadata: {e}"))
             .ok();
 
-        api::upload_multipart_complete(app, &video_id, "display.mp4", &upload_id, &parts, metadata.clone())
-            .await?;
+        api::upload_multipart_complete(
+            app,
+            &video_id,
+            "display.mp4",
+            &upload_id,
+            &parts,
+            metadata.clone(),
+        )
+        .await?;
 
         Ok(metadata)
     };

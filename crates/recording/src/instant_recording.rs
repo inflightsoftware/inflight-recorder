@@ -7,7 +7,7 @@ use crate::{
     output_pipeline::{self, OutputPipeline},
     sources::screen_capture::{ScreenCaptureConfig, ScreenCaptureTarget},
 };
-use anyhow::Context as _;
+use anyhow::{Context as _, anyhow};
 use cap_media_info::{AudioInfo, VideoInfo};
 use cap_project::InstantRecordingMeta;
 use cap_timestamp::Timestamps;

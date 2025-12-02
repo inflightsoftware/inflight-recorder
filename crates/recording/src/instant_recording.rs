@@ -289,10 +289,16 @@ async fn create_pipeline(
     .await?;
 
     let camera = OptionFuture::from(base_inputs.camera_feed.map(|camera_feed| {
+        let camera_info = camera_feed.video_info();
+        let camera_resolution = clamp_size((camera_info.width, camera_info.height), (1280, 720));
+
         OutputPipeline::builder(content_dir.join("camera.mp4"))
             .with_video::<crate::sources::Camera>(camera_feed)
             .with_timestamps(start_time)
-            .build::<crate::ffmpeg::Mp4Muxer>(())
+            .build::<crate::ffmpeg::Mp4Muxer>(crate::ffmpeg::Mp4MuxerConfig {
+                output_size: Some(camera_resolution),
+                bpp: Some(0.15),
+            })
             .instrument(error_span!("camera-out"))
     }))
     .await

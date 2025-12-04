@@ -169,8 +169,9 @@ impl CapWindowId {
             Self::Editor { .. } | Self::ScreenshotEditor { .. } => {
                 Some(Some(LogicalPosition::new(20.0, 32.0)))
             }
-            // Self::Settings => Some(Some(LogicalPosition::new(16.0, 28.0))),
-            Self::Setup | Self::RecordingControls => Some(Some(LogicalPosition::new(-100.0, -100.0))),
+            Self::Setup | Self::RecordingControls => {
+                Some(Some(LogicalPosition::new(-100.0, -100.0)))
+            }
             Self::Camera
             | Self::WindowCaptureOccluder { .. }
             | Self::CaptureArea

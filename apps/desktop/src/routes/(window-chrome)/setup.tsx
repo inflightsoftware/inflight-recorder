@@ -161,7 +161,7 @@ export default function () {
 				</div>
 			</Show>
 
-			<div class="absolute right-0 w-[410px] h-[560px]">
+			<div class="absolute right-0 w-[410px] h-full">
 				<img
 					class="absolute inset-0 w-full h-full object-cover"
 					src={welcome}

@@ -128,8 +128,8 @@ export default function () {
 												{permissionCheck() === "granted"
 													? "Granted"
 													: permissionCheck() !== "denied"
-													? "Grant Permission"
-													: "Request Permission"}
+													? "Grant"
+													: "Grant"}
 											</button>
 										</li>
 									</Show>

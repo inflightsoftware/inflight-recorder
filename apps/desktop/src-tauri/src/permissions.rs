@@ -162,18 +162,18 @@ pub fn do_permissions_check(_initial_check: bool) -> OSPermissionsCheck {
             }
         }
 
+        let screen_recording_permitted = scap_screencapturekit::has_permission();
+        let accessibility_permitted = unsafe { AXIsProcessTrusted() };
+
         OSPermissionsCheck {
-            screen_recording: {
-                let result = scap_screencapturekit::has_permission();
-                match (result, _initial_check) {
-                    (true, _) => OSPermissionStatus::Granted,
-                    (false, true) => OSPermissionStatus::Empty,
-                    (false, false) => OSPermissionStatus::Denied,
-                }
+            screen_recording: if screen_recording_permitted {
+                OSPermissionStatus::Granted
+            } else {
+                OSPermissionStatus::Denied
             },
             microphone: check_av_permission(MediaType::audio()),
             camera: check_av_permission(MediaType::video()),
-            accessibility: if unsafe { AXIsProcessTrusted() } {
+            accessibility: if accessibility_permitted {
                 OSPermissionStatus::Granted
             } else {
                 OSPermissionStatus::Denied

@@ -22,7 +22,7 @@ export type ChunkUploadState = {
 	status: "queued" | "uploading" | "complete" | "error";
 };
 
-export type RecordingFailureDownload = {
-	url: string;
-	fileName: string;
-};
+// export type RecordingFailureDownload = {
+// 	url: string;
+// 	fileName: string;
+// };

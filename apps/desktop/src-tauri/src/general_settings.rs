@@ -148,7 +148,9 @@ fn default_instant_mode_max_resolution() -> u32 {
 }
 
 fn default_server_url() -> String {
-    "https://www.inflight.co".to_string()
+    std::option_env!("VITE_SERVER_URL")
+        .unwrap_or("https://inflight.co")
+        .to_string()
 }
 
 #[derive(Serialize, Deserialize, Type, Debug, Clone)]

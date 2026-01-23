@@ -35,8 +35,8 @@ async function createSessionRequestUrl(
 	port: string | null,
 	platform: "web" | "desktop",
 ) {
-	const storedSettings = await generalSettingsStore.get();
-	const serverUrl = storedSettings?.serverUrl ?? "https://www.inflight.co";
+	const serverUrl =
+		(await generalSettingsStore.get())?.serverUrl ?? "https://inflight.co";
 	const callbackUrl = new URL(
 		`/api/desktop/session/request?type=api_key`,
 		serverUrl,

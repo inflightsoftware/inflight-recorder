@@ -30,20 +30,13 @@ impl Default for RetryableHttpClient {
                     reqwest::retry::always()
                         .classify_fn(|req_rep| {
                             match req_rep.status() {
-                                // Server errors
-                                Some(s)
-                                    if s.is_server_error()
-                                        || s == StatusCode::TOO_MANY_REQUESTS =>
-                                {
-                                    req_rep.retryable()
-                                }
-                                // Network errors
+                                Some(s) if s.is_server_error() => req_rep.retryable(),
                                 None => req_rep.retryable(),
                                 _ => req_rep.success(),
                             }
                         })
-                        .max_retries_per_request(5)
-                        .max_extra_load(5.0),
+                        .max_retries_per_request(3)
+                        .max_extra_load(2.0),
                 )
                 .build(),
         )

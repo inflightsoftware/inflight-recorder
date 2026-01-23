@@ -4,35 +4,25 @@ import { useNavigate } from "@solidjs/router";
 import { createMutation, queryOptions, useQuery } from "@tanstack/solid-query";
 import { Channel } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import {
-	getAllWebviewWindows,
-	WebviewWindow,
-} from "@tauri-apps/api/webviewWindow";
+import { getAllWebviewWindows } from "@tauri-apps/api/webviewWindow";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import * as dialog from "@tauri-apps/plugin-dialog";
-import { type as ostype } from "@tauri-apps/plugin-os";
 import * as shell from "@tauri-apps/plugin-shell";
 import * as updater from "@tauri-apps/plugin-updater";
-import { cx } from "cva";
 import {
 	createEffect,
 	createMemo,
 	createSignal,
-	ErrorBoundary,
 	onCleanup,
 	onMount,
 	Show,
-	Suspense,
 } from "solid-js";
 import { createStore, produce, reconcile } from "solid-js/store";
 import { Transition } from "solid-transition-group";
-import Mode from "~/components/Mode";
-import Tooltip from "~/components/Tooltip";
 import {
 	CloseIcon,
 	CropIcon,
 	DisplayIcon,
-	InflightLogo,
 	NoCameraIcon,
 	SettingsIcon,
 	WindowIcon,
@@ -67,31 +57,18 @@ import {
 	type ScreenCaptureTarget,
 	type UploadProgress,
 } from "~/utils/tauri";
-import IconCapLogoFull from "~icons/cap/logo-full";
-import IconCapLogoFullDark from "~icons/cap/logo-full-dark";
-import IconCapSettings from "~icons/cap/settings";
-import IconLucideAppWindowMac from "~icons/lucide/app-window-mac";
 import IconLucideArrowLeft from "~icons/lucide/arrow-left";
-import IconLucideBug from "~icons/lucide/bug";
-import IconLucideImage from "~icons/lucide/image";
 import IconLucideSearch from "~icons/lucide/search";
-import IconLucideSquarePlay from "~icons/lucide/square-play";
-import IconMaterialSymbolsScreenshotFrame2Rounded from "~icons/material-symbols/screenshot-frame-2-rounded";
-import IconMdiMonitor from "~icons/mdi/monitor";
-import { WindowChromeHeader } from "../Context";
 import {
 	RecordingOptionsProvider,
 	useRecordingOptions,
 } from "../OptionsContext";
 import CameraSelect from "./CameraSelect";
-import ChangelogButton from "./ChangeLogButton";
 import HorizontalTargetButton from "./HorizontalTargetButton";
 import MicrophoneSelect from "./MicrophoneSelect";
 import SystemAudio from "./SystemAudio";
 import type { RecordingWithPath, ScreenshotWithPath } from "./TargetCard";
-import TargetDropdownButton from "./TargetDropdownButton";
 import TargetMenuGrid from "./TargetMenuGrid";
-import TargetTypeButton from "./TargetTypeButton";
 import VerticalTargetButton from "./VerticalTargetButton";
 
 const WINDOW_SIZE = { width: 290, height: 442 } as const;
@@ -526,7 +503,9 @@ function CameraPreview(props: { selectedCamera: CameraInfo | undefined }) {
 					}
 				>
 					<canvas
-						ref={canvasRef!}
+						ref={(el) => {
+							canvasRef = el;
+						}}
 						class="w-full h-full object-cover"
 						style={{ transform: "scaleX(-1)" }}
 						width={latestFrame()?.width}
@@ -549,7 +528,7 @@ function Page() {
 	const { rawOptions, setOptions } = useRecordingOptions();
 	const currentRecording = createCurrentRecordingQuery();
 	const isRecording = () => !!currentRecording.data;
-	const auth = authStore.createQuery();
+	const _auth = authStore.createQuery();
 
 	const [displayMenuOpen, setDisplayMenuOpen] = createSignal(false);
 	const [windowMenuOpen, setWindowMenuOpen] = createSignal(false);
@@ -564,8 +543,8 @@ function Page() {
 		if (screenshotsMenuOpen()) return "screenshot";
 		return null;
 	});
-	const [hasOpenedDisplayMenu, setHasOpenedDisplayMenu] = createSignal(false);
-	const [hasOpenedWindowMenu, setHasOpenedWindowMenu] = createSignal(false);
+	const [hasOpenedDisplayMenu, _setHasOpenedDisplayMenu] = createSignal(false);
+	const [hasOpenedWindowMenu, _setHasOpenedWindowMenu] = createSignal(false);
 
 	let displayTriggerRef: HTMLButtonElement | undefined;
 	let windowTriggerRef: HTMLButtonElement | undefined;
@@ -903,7 +882,7 @@ function Page() {
 		},
 	};
 
-	const toggleTargetMode = (mode: "display" | "window" | "area") => {
+	const _toggleTargetMode = (mode: "display" | "window" | "area") => {
 		if (isRecording()) return;
 		const nextMode = rawOptions.targetMode === mode ? null : mode;
 		setOptions("targetMode", nextMode);
@@ -982,7 +961,7 @@ function Page() {
 		else if (rawOptions.cameraID === null) setCamera.mutate(null);
 	});
 
-	const license = createLicenseQuery();
+	const _license = createLicenseQuery();
 
 	const signIn = createSignInMutation();
 
@@ -1064,11 +1043,10 @@ function Page() {
 							disabled={isRecording()}
 							onClick={() => {
 								if (isRecording()) return;
-								setOptions("targetMode", (v) =>
-									v === "display" ? null : "display",
-								);
-								if (rawOptions.targetMode)
-									commands.openTargetSelectOverlays(null);
+								const newMode =
+									rawOptions.targetMode === "display" ? null : "display";
+								setOptions("targetMode", newMode);
+								if (newMode) commands.openTargetSelectOverlays(null);
 								else commands.closeTargetSelectOverlays();
 							}}
 							name="Display"
@@ -1079,11 +1057,10 @@ function Page() {
 							disabled={isRecording()}
 							onClick={() => {
 								if (isRecording()) return;
-								setOptions("targetMode", (v) =>
-									v === "window" ? null : "window",
-								);
-								if (rawOptions.targetMode)
-									commands.openTargetSelectOverlays(null);
+								const newMode =
+									rawOptions.targetMode === "window" ? null : "window";
+								setOptions("targetMode", newMode);
+								if (newMode) commands.openTargetSelectOverlays(null);
 								else commands.closeTargetSelectOverlays();
 							}}
 							name="Window"
@@ -1094,9 +1071,10 @@ function Page() {
 							disabled={isRecording()}
 							onClick={() => {
 								if (isRecording()) return;
-								setOptions("targetMode", (v) => (v === "area" ? null : "area"));
-								if (rawOptions.targetMode)
-									commands.openTargetSelectOverlays(null);
+								const newMode =
+									rawOptions.targetMode === "area" ? null : "area";
+								setOptions("targetMode", newMode);
+								if (newMode) commands.openTargetSelectOverlays(null);
 								else commands.closeTargetSelectOverlays();
 							}}
 							name="Area"
@@ -1107,7 +1085,7 @@ function Page() {
 		</div>
 	);
 
-	const RecordingControls = () => (
+	const _RecordingControls = () => (
 		<div class="flex flex-col gap-4 px-4 pb-4">
 			<p class="text-xs text-white/70 leading-none">Select what to record</p>
 			<div class="flex flex-col gap-2 w-full">
@@ -1117,10 +1095,10 @@ function Page() {
 					disabled={isRecording()}
 					onClick={() => {
 						if (isRecording()) return;
-						setOptions("targetMode", (v) =>
-							v === "display" ? null : "display",
-						);
-						if (rawOptions.targetMode) commands.openTargetSelectOverlays(null);
+						const newMode =
+							rawOptions.targetMode === "display" ? null : "display";
+						setOptions("targetMode", newMode);
+						if (newMode) commands.openTargetSelectOverlays(null);
 						else commands.closeTargetSelectOverlays();
 					}}
 					name="Display"
@@ -1131,8 +1109,10 @@ function Page() {
 					disabled={isRecording()}
 					onClick={() => {
 						if (isRecording()) return;
-						setOptions("targetMode", (v) => (v === "window" ? null : "window"));
-						if (rawOptions.targetMode) commands.openTargetSelectOverlays(null);
+						const newMode =
+							rawOptions.targetMode === "window" ? null : "window";
+						setOptions("targetMode", newMode);
+						if (newMode) commands.openTargetSelectOverlays(null);
 						else commands.closeTargetSelectOverlays();
 					}}
 					name="Window"
@@ -1143,8 +1123,9 @@ function Page() {
 					disabled={isRecording()}
 					onClick={() => {
 						if (isRecording()) return;
-						setOptions("targetMode", (v) => (v === "area" ? null : "area"));
-						if (rawOptions.targetMode) commands.openTargetSelectOverlays(null);
+						const newMode = rawOptions.targetMode === "area" ? null : "area";
+						setOptions("targetMode", newMode);
+						if (newMode) commands.openTargetSelectOverlays(null);
 						else commands.closeTargetSelectOverlays();
 					}}
 					name="Area"

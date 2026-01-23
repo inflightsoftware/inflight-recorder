@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Inflight Recorder is a video messaging tool (fork of Cap, the open source Loom alternative). It's a Turborepo monorepo with a Tauri v2 desktop app (Rust + SolidStart) and a Next.js web app.
 
+**Note**: Package imports use the `@inflight/*` namespace (e.g., `@inflight/database`, `@inflight/web`).
+
 **Core Applications:**
 - `apps/web` — Next.js 15 (App Router) web application for sharing, management, dashboard
 - `apps/desktop` — Tauri v2 desktop app with SolidStart (recording, editing)
@@ -27,11 +29,14 @@ Inflight Recorder is a video messaging tool (fork of Cap, the open source Loom a
 **Rust Crates** (`crates/*`):
 - `recording` — Core recording functionality
 - `media`, `audio`, `video-decode` — Media processing pipeline
-- `rendering`, `rendering-skia` — Video rendering and effects
-- `camera*` — Cross-platform camera handling (AVFoundation, DirectShow, MediaFoundation)
-- `scap-*` — Screen capture implementations (ScreenCaptureKit, Direct3D)
-- `enc-*` — Encoding implementations (FFmpeg, AVFoundation, MediaFoundation, GIF)
+- `rendering`, `rendering-skia` — Video rendering (Skia-based)
+- `camera`, `camera-avfoundation`, `camera-directshow`, `camera-mediafoundation`, `camera-ffmpeg`, `camera-windows` — Cross-platform camera handling
+- `scap-screencapturekit`, `scap-direct3d`, `scap-cpal`, `scap-ffmpeg`, `scap-targets` — Screen capture implementations
+- `enc-ffmpeg`, `enc-avfoundation`, `enc-mediafoundation`, `enc-gif` — Encoding implementations
 - `export`, `editor`, `project` — Export and editing functionality
+- `cursor-capture`, `cursor-info` — Cursor tracking
+- `gpu-converters`, `frame-converter` — GPU/frame conversion utilities
+- `api` — API client for web backend
 
 ## Key Commands
 
@@ -41,6 +46,10 @@ pnpm install              # Install dependencies
 pnpm env-setup            # Generate .env file (interactive)
 pnpm cap-setup            # Install native dependencies (FFmpeg, etc.)
 ```
+
+**Platform-specific requirements:**
+- **macOS**: cmake must be installed
+- **Windows**: llvm, clang, and VCPKG must be installed
 
 ### Development
 ```bash
@@ -55,8 +64,9 @@ cd apps/web && pnpm dev   # Web without Docker
 pnpm build                # Build all via Turbo
 pnpm tauri:build          # Build desktop release
 pnpm lint                 # Lint with Biome
-pnpm format               # Format with Biome
+pnpm format               # Format with Biome (tabs, double quotes)
 pnpm typecheck            # TypeScript check
+pnpm clean                # Remove node_modules, .next, .turbo, dist
 cargo fmt                 # Format Rust code
 cargo build -p <crate>    # Build specific Rust crate
 cargo test -p <crate>     # Test specific Rust crate
@@ -100,6 +110,10 @@ Always run: `pnpm db:generate` → `pnpm db:push` → test
 
 ### Desktop Permissions (macOS)
 When running from terminal, grant screen/mic permissions to the terminal app, not the Inflight app.
+
+### Recording Storage Locations
+- **macOS**: `~/Library/Application Support/so.cap.desktop.dev/recordings`
+- **Windows**: `%programfiles%/so.cap.desktop.dev/recordings`
 
 ## Architecture Patterns
 
@@ -201,3 +215,5 @@ const { data, isLoading } = useQuery({
 - **IPC binding errors**: Restart dev server to regenerate `tauri.ts`
 - **Node version**: Must be 20+
 - **Clean rebuild**: `pnpm clean`
+- **Tauri plugin version mismatches**: `pnpm check-tauri-versions`
+- **Run command with env vars**: `pnpm with-env -- <command>`

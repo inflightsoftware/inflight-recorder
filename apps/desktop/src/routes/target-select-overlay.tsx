@@ -1,8 +1,7 @@
-import { Button } from "@inflight/ui-solid";
 import { createEventListener } from "@solid-primitives/event-listener";
 import { createElementSize } from "@solid-primitives/resize-observer";
 import { useSearchParams } from "@solidjs/router";
-import { createMutation, useQuery } from "@tanstack/solid-query";
+import { useQuery } from "@tanstack/solid-query";
 import { invoke } from "@tauri-apps/api/core";
 import {
 	LogicalPosition,
@@ -10,12 +9,7 @@ import {
 	type PhysicalSize,
 } from "@tauri-apps/api/dpi";
 import { emit } from "@tauri-apps/api/event";
-import {
-	CheckMenuItem,
-	Menu,
-	MenuItem,
-	PredefinedMenuItem,
-} from "@tauri-apps/api/menu";
+import { CheckMenuItem, Menu, PredefinedMenuItem } from "@tauri-apps/api/menu";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { type as ostype } from "@tauri-apps/plugin-os";
 import {
@@ -23,7 +17,6 @@ import {
 	createMemo,
 	createSignal,
 	Match,
-	mergeProps,
 	onCleanup,
 	onMount,
 	Show,
@@ -43,15 +36,8 @@ import {
 import ModeSelect from "~/components/ModeSelect";
 import SelectionHint from "~/components/selection-hint";
 import { ArrowUpRight, DoubleArrowSwitcher, RecordFill } from "~/icons";
-import { authStore, generalSettingsStore } from "~/store";
-import {
-	createCameraMutation,
-	createOptionsQuery,
-	createOrganizationsQuery,
-	createWorkspacesQuery,
-	listAudioDevices,
-	listVideoDevices,
-} from "~/utils/queries";
+import { authStore } from "~/store";
+import { createOptionsQuery, createWorkspacesQuery } from "~/utils/queries";
 import {
 	type CameraInfo,
 	commands,
@@ -61,8 +47,6 @@ import {
 	type ScreenCaptureTarget,
 	type TargetUnderCursor,
 } from "~/utils/tauri";
-import CameraSelect from "./(window-chrome)/new-main/CameraSelect";
-import MicrophoneSelect from "./(window-chrome)/new-main/MicrophoneSelect";
 import {
 	RecordingOptionsProvider,
 	useRecordingOptions,
@@ -70,11 +54,11 @@ import {
 
 const MIN_SIZE = { width: 150, height: 150 };
 
-const capitalize = (str: string) => {
+const _capitalize = (str: string) => {
 	return str.charAt(0).toUpperCase() + str.slice(1);
 };
 
-const findCamera = (cameras: CameraInfo[], id?: DeviceOrModelID | null) => {
+const _findCamera = (cameras: CameraInfo[], id?: DeviceOrModelID | null) => {
 	if (!id) return undefined;
 	return cameras.find((camera) =>
 		"DeviceID" in id
@@ -880,7 +864,7 @@ function RecordingControls(props: {
 			),
 		});
 
-	const menuModes = async () =>
+	const _menuModes = async () =>
 		await Menu.new({
 			items: [
 				await CheckMenuItem.new({
@@ -948,7 +932,7 @@ function RecordingControls(props: {
 		menu.then((menu) => menu.popup(new LogicalPosition(rect.x, rect.y + 40)));
 	}
 
-	const startDisabled = () => !!props.disabled;
+	const _startDisabled = () => !!props.disabled;
 
 	return (
 		<>

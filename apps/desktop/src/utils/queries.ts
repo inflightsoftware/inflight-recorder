@@ -268,13 +268,26 @@ export function createCustomDomainQuery() {
 
 export function createOrganizationsQuery() {
 	const auth = authStore.createQuery();
+	let lastFetchTimestamp = 0;
+	let lastFetchedUserId: string | null = null;
 
-	// Refresh organizations if they're missing
+	const COOLDOWN_MS = 15_000;
+
 	createEffect(() => {
-		if (
-			auth.data?.user_id &&
-			(!auth.data?.organizations || auth.data.organizations.length === 0)
-		) {
+		const userId = auth.data?.user_id;
+		const now = Date.now();
+
+		if (userId !== lastFetchedUserId) {
+			lastFetchTimestamp = 0;
+			lastFetchedUserId = userId ?? null;
+		}
+
+		if (!userId) return;
+
+		const timeSinceLastFetch = now - lastFetchTimestamp;
+
+		if (timeSinceLastFetch >= COOLDOWN_MS) {
+			lastFetchTimestamp = now;
 			commands.updateAuthPlan().catch(console.error);
 		}
 	});
@@ -284,12 +297,26 @@ export function createOrganizationsQuery() {
 
 export function createWorkspacesQuery() {
 	const auth = authStore.createQuery();
+	let lastFetchTimestamp = 0;
+	let lastFetchedUserId: string | null = null;
+
+	const COOLDOWN_MS = 15_000;
 
 	createEffect(() => {
-		if (
-			auth.data?.user_id &&
-			(!auth.data?.workspaces || auth.data.workspaces.length === 0)
-		) {
+		const userId = auth.data?.user_id;
+		const now = Date.now();
+
+		if (userId !== lastFetchedUserId) {
+			lastFetchTimestamp = 0;
+			lastFetchedUserId = userId ?? null;
+		}
+
+		if (!userId) return;
+
+		const timeSinceLastFetch = now - lastFetchTimestamp;
+
+		if (timeSinceLastFetch >= COOLDOWN_MS) {
+			lastFetchTimestamp = now;
 			commands.updateAuthPlan().catch(console.error);
 		}
 	});

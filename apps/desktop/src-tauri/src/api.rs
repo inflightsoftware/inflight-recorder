@@ -327,4 +327,3 @@ pub async fn fetch_workspaces(app: &AppHandle) -> Result<Vec<Workspace>, AuthedA
 
     Ok(response.workspaces)
 }
-

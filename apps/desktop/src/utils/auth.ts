@@ -6,8 +6,9 @@ import { onOpenUrl } from "@tauri-apps/plugin-deep-link";
 import * as shell from "@tauri-apps/plugin-shell";
 import { z } from "zod";
 import callbackTemplate from "~/components/callback.template";
-import { authStore, generalSettingsStore } from "~/store";
+import { authStore } from "~/store";
 import { identifyUser, trackEvent } from "./analytics";
+import { clientEnv } from "./env";
 import { commands } from "./tauri";
 
 export function createSignInMutation() {
@@ -35,17 +36,11 @@ async function createSessionRequestUrl(
 	port: string | null,
 	platform: "web" | "desktop",
 ) {
-	const storedSettings = await generalSettingsStore.get();
-	const serverUrl = storedSettings?.serverUrl ?? "https://www.inflight.co";
-	const callbackUrl = new URL(
-		`/api/desktop/session/request?type=api_key`,
-		serverUrl,
-	);
-
-	if (port !== null) callbackUrl.searchParams.set("port", port);
-	callbackUrl.searchParams.set("platform", platform);
-
-	return callbackUrl;
+	const webUrl = clientEnv.VITE_WEB_URL;
+	const url = new URL("/desktop/connect", webUrl);
+	if (port !== null) url.searchParams.set("port", port);
+	url.searchParams.set("platform", platform);
+	return url;
 }
 
 async function createLocalServerSession(signal: AbortSignal) {

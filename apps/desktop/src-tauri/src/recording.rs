@@ -441,7 +441,7 @@ pub async fn start_recording(
                     } else {
                         format!("/s/{}", link_id)
                     };
-                    let link = app.make_app_url(link_path).await;
+                    let link = app.make_web_url(link_path).await;
                     info!("Pre-created shareable link: {}", link);
 
                     Some(VideoUploadInfo {
@@ -1072,7 +1072,7 @@ pub async fn delete_recording(app: AppHandle, state: MutableState<'_, App>) -> R
         if let Some(id) = video_id {
             let _ = app
                 .authed_api_request(
-                    format!("/api/desktop/video/delete?videoId={id}"),
+                    format!("/api/desktop/recording/delete?videoId={id}"),
                     |c, url| c.delete(url),
                 )
                 .await;

@@ -1,17 +1,20 @@
 {
-	"permissions": {
-		"allow": [
-			"Bash(pnpm typecheck:*)",
-			"Bash(pnpm lint:*)",
-			"Bash(pnpm build:*)",
-			"Bash(cargo check:*)",
-			"Bash(cargo fmt:*)",
-			"Bash(pnpm format:*)",
-			"Bash(pnpm exec biome check:*)",
-			"Bash(/opt/homebrew/bin/pnpm format)",
-			"Bash(~/.cargo/bin/cargo check -p scap-targets)"
-		],
-		"deny": [],
-		"ask": []
-	}
+  "permissions": {
+    "allow": [
+      "Bash(pnpm typecheck:*)",
+      "Bash(pnpm lint:*)",
+      "Bash(pnpm build:*)",
+      "Bash(cargo check:*)",
+      "Bash(cargo fmt:*)",
+      "Bash(pnpm format:*)",
+      "Bash(pnpm exec biome check:*)",
+      "Bash(/opt/homebrew/bin/pnpm format)",
+      "Bash(~/.cargo/bin/cargo check -p scap-targets)",
+      "Bash(grep -rn \"authed_api_request\\\\|api_request\" /Users/veergadodia/inflight/inflight-recorder/apps/desktop/src-tauri/src/*.rs | grep -v \"^Binary\" | head -60)",
+      "Bash(grep -rn '\"/api/' /Users/veergadodia/inflight/inflight-recorder/apps/desktop/src-tauri/src/*.rs | grep -v \"^Binary\")",
+      "Bash(find /Users/veergadodia/inflight/inflight-recorder/apps/desktop -name \".env*\" 2>/dev/null | head -20)"
+    ],
+    "deny": [],
+    "ask": []
+  }
 }

@@ -22,7 +22,7 @@ pub async fn upload_multipart_initiate(
     }
 
     let resp = app
-        .authed_api_request("/api/upload/multipart/initiate", |c, url| {
+        .authed_api_request("/api/desktop/upload/multipart/initiate", |c, url| {
             c.post(url)
                 .header("Content-Type", "application/json")
                 .json(&serde_json::json!({
@@ -76,7 +76,7 @@ pub async fn upload_multipart_presign_part(
     }
 
     let resp = app
-        .authed_api_request("/api/upload/multipart/presign-part", |c, url| {
+        .authed_api_request("/api/desktop/upload/multipart/presign-part", |c, url| {
             c.post(url)
                 .header("Content-Type", "application/json")
                 .json(&serde_json::json!(body))
@@ -148,7 +148,7 @@ pub async fn upload_multipart_complete(
     trace!("Completing multipart upload");
 
     let resp = app
-        .authed_api_request("/api/upload/multipart/complete", |c, url| {
+        .authed_api_request("/api/desktop/upload/multipart/complete", |c, url| {
             c.post(url)
                 .header("Content-Type", "application/json")
                 .json(&MultipartCompleteRequest {
@@ -212,7 +212,7 @@ pub async fn upload_signed(
     }
 
     let resp = app
-        .authed_api_request("/api/upload/signed", |client, url| {
+        .authed_api_request("/api/desktop/upload/signed", |client, url| {
             client.post(url).json(&body)
         })
         .await
@@ -241,7 +241,7 @@ pub async fn desktop_video_progress(
     total: u64,
 ) -> Result<(), AuthedApiError> {
     let resp = app
-        .authed_api_request("/api/desktop/video/progress", |client, url| {
+        .authed_api_request("/api/desktop/upload/progress", |client, url| {
             client.post(url).json(&json!({
                 "videoId": video_id,
                 "uploaded": uploaded,

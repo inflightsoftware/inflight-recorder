@@ -93,6 +93,8 @@ pub trait ManagerExt<R: Runtime>: Manager<R> {
 
     async fn make_app_url(&self, pathname: impl AsRef<str>) -> String;
 
+    async fn make_web_url(&self, pathname: impl AsRef<str>) -> String;
+
     async fn is_server_url_custom(&self) -> bool;
 }
 
@@ -136,6 +138,12 @@ impl<T: Manager<R> + Emitter<R>, R: Runtime> ManagerExt<R> for T {
         let app_state = self.state::<ArcLock<crate::App>>();
         let server_url = &app_state.read().await.server_url;
         format!("{}{}", server_url, pathname.as_ref())
+    }
+
+    async fn make_web_url(&self, pathname: impl AsRef<str>) -> String {
+        let app_state = self.state::<ArcLock<crate::App>>();
+        let web_url = &app_state.read().await.web_url;
+        format!("{}{}", web_url, pathname.as_ref())
     }
 
     async fn is_server_url_custom(&self) -> bool {

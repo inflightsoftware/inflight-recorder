@@ -19,6 +19,7 @@ import { createStore, reconcile } from "solid-js/store";
 import Mode from "~/components/Mode";
 import Tooltip from "~/components/Tooltip";
 import { identifyUser, trackEvent } from "~/utils/analytics";
+import { clientEnv } from "~/utils/env";
 import {
 	createCameraMutation,
 	createCurrentRecordingQuery,
@@ -319,8 +320,8 @@ function Page() {
 						target="_blank"
 						href={
 							auth.data
-								? `${import.meta.env.VITE_SERVER_URL}/dashboard`
-								: import.meta.env.VITE_SERVER_URL
+								? `${clientEnv.VITE_WEB_URL}/dashboard`
+								: clientEnv.VITE_WEB_URL
 						}
 					>
 						<IconCapLogoFullDark class="hidden dark:block" />

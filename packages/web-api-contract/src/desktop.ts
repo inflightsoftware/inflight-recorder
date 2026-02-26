@@ -136,7 +136,7 @@ const protectedContract = c.router(
 		},
 		deleteVideo: {
 			method: "DELETE",
-			path: "/desktop/video/delete",
+			path: "/desktop/recording/delete",
 			query: z.object({ videoId: z.string() }),
 			responses: { 200: z.unknown() },
 		},

@@ -36,7 +36,7 @@ export const apiClient = initClient(contract, {
 	api,
 });
 export const licenseApiClient = initClient(licenseContract, {
-	baseUrl: `https://l.cap.so/api`,
+	baseUrl: `https://www.inflight.co/api`,
 	api,
 });
 

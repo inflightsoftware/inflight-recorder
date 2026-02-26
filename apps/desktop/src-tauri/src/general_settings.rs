@@ -94,8 +94,6 @@ pub struct GeneralSettingsStore {
     // Renamed from `custom_cursor_capture` to `custom_cursor_capture2` so we can change the default.
     #[serde(default = "default_true", rename = "custom_cursor_capture2")]
     pub custom_cursor_capture: bool,
-    #[serde(default = "default_server_url")]
-    pub server_url: String,
     #[serde(default)]
     pub recording_countdown: Option<u32>,
     // #[deprecated = "can be removed when native camera preview is ready"]
@@ -147,9 +145,6 @@ fn default_instant_mode_max_resolution() -> u32 {
     1920
 }
 
-fn default_server_url() -> String {
-    "https://www.inflight.co".to_string()
-}
 
 #[derive(Serialize, Deserialize, Type, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -177,7 +172,6 @@ impl Default for GeneralSettingsStore {
             post_studio_recording_behaviour: PostStudioRecordingBehaviour::OpenEditor,
             main_window_recording_start_behaviour: MainWindowRecordingStartBehaviour::Close,
             custom_cursor_capture: true,
-            server_url: default_server_url(),
             recording_countdown: Some(3),
             enable_native_camera_preview: default_enable_native_camera_preview(),
             auto_zoom_on_clicks: false,

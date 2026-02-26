@@ -129,6 +129,7 @@ pub struct App {
     camera_cleanup_done: bool,
     camera_feed: ActorRef<feeds::camera::CameraFeed>,
     server_url: String,
+    web_url: String,
     logs_dir: PathBuf,
     disconnected_inputs: HashSet<RecordingInputKind>,
 }
@@ -2249,6 +2250,14 @@ async fn set_server_url(app: MutableState<'_, App>, server_url: String) -> Resul
 #[tauri::command]
 #[specta::specta]
 #[instrument(skip(app))]
+async fn set_web_url(app: MutableState<'_, App>, web_url: String) -> Result<(), ()> {
+    app.write().await.web_url = web_url;
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+#[instrument(skip(app))]
 async fn set_camera_preview_state(
     app: MutableState<'_, App>,
     state: CameraPreviewState,
@@ -2378,6 +2387,7 @@ pub async fn run(recording_logging_handle: LoggingHandle, logs_dir: PathBuf) {
             get_editor_meta,
             set_pretty_name,
             set_server_url,
+            set_web_url,
             set_camera_preview_state,
             await_camera_preview_ready,
             captions::create_dir,
@@ -2595,35 +2605,19 @@ pub async fn run(recording_logging_handle: LoggingHandle, logs_dir: PathBuf) {
             });
 
             {
-                let (server_url, should_update) = if cfg!(debug_assertions)
-                    && let Ok(url) = std::env::var("VITE_SERVER_URL")
-                {
-                    (url, true)
-                } else if let Some(url) = GeneralSettingsStore::get(&app)
-                    .ok()
-                    .flatten()
-                    .map(|v| v.server_url.clone())
-                {
-                    (url, false)
-                } else {
-                    (
-                        option_env!("VITE_SERVER_URL")
-                            .unwrap_or("https://inflight.co")
-                            .to_string(),
-                        true,
-                    )
-                };
-
-                // This ensures settings reflects the correct value if it's set at startup
-                if should_update {
-                    GeneralSettingsStore::update(&app, |s| {
-                        s.server_url = server_url.clone();
-                    })
-                    .map_err(|err| warn!("Error updating server URL into settings store: {err}"))
-                    .ok();
-                }
+                let server_url = std::env::var("VITE_SERVER_URL").unwrap_or_else(|_| {
+                    option_env!("VITE_SERVER_URL")
+                        .unwrap_or("https://api.inflight.co")
+                        .to_string()
+                });
 
                 posthog::set_server_url(&server_url);
+
+                let web_url = std::env::var("VITE_WEB_URL").unwrap_or_else(|_| {
+                    option_env!("VITE_WEB_URL")
+                        .unwrap_or("https://www.inflight.co")
+                        .to_string()
+                });
 
                 app.manage(Arc::new(RwLock::new(App {
                     camera_ws_port,
@@ -2639,6 +2633,7 @@ pub async fn run(recording_logging_handle: LoggingHandle, logs_dir: PathBuf) {
                     camera_cleanup_done: false,
                     camera_feed,
                     server_url,
+                    web_url,
                     logs_dir: logs_dir.clone(),
                     disconnected_inputs: HashSet::new(),
                 })));

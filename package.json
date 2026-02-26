@@ -43,7 +43,7 @@
 		"turbo": "^2.3.4",
 		"typescript": "^5.8.3"
 	},
-	"packageManager": "pnpm@10.5.2",
+	"packageManager": "pnpm@10.30.3",
 	"name": "inflight",
 	"engines": {
 		"node": ">=20"

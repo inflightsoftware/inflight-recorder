@@ -1,13 +1,10 @@
 import { Router, useCurrentMatches } from "@solidjs/router";
 import { FileRoutes } from "@solidjs/start/router";
 import { QueryClient, QueryClientProvider } from "@tanstack/solid-query";
-import {
-	getCurrentWebviewWindow,
-	type WebviewWindow,
-} from "@tauri-apps/api/webviewWindow";
+import { getCurrentWebviewWindow, type WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { message } from "@tauri-apps/plugin-dialog";
 import { createEffect, onCleanup, onMount, Suspense } from "solid-js";
-import { Toaster } from "solid-toast";
+import toast, { Toaster } from "solid-toast";
 
 import "@inflight/ui-solid/main.css";
 import "unfonts.css";
@@ -16,7 +13,8 @@ import "./styles/theme.css";
 import { CapErrorBoundary } from "./components/CapErrorBoundary";
 import { generalSettingsStore } from "./store";
 import { initAnonymousUser } from "./utils/analytics";
-import { type AppTheme, commands } from "./utils/tauri";
+import { createTauriEventListener } from "./utils/createEventListener";
+import { type AppTheme, commands, events } from "./utils/tauri";
 import titlebar from "./utils/titlebar-state";
 
 const queryClient = new QueryClient({
@@ -52,12 +50,30 @@ function Inner() {
 		initAnonymousUser();
 	});
 
+	createTauriEventListener(events.newNotification, (payload) => {
+		if (payload.is_error) {
+			toast.error(payload.body, {
+				style: {
+					background: "#FEE2E2",
+					color: "#991B1B",
+					border: "1px solid #F87171",
+				},
+				iconTheme: {
+					primary: "#991B1B",
+					secondary: "#FEE2E2",
+				},
+			});
+		} else {
+			toast.success(payload.body);
+		}
+	});
+
 	return (
 		<>
 			<Toaster
-				position="bottom-right"
+				position="top-center"
 				containerStyle={{
-					"margin-top": titlebar.height,
+					"margin-top": 0,
 				}}
 				toastOptions={{
 					duration: 3500,
@@ -66,7 +82,7 @@ function Inner() {
 						"border-radius": "15px",
 						"border-color": "var(--gray-200)",
 						"border-width": "1px",
-						"font-size": "1rem",
+						"font-size": "0.8125rem",
 						"background-color": "var(--gray-50)",
 						color: "var(--text-secondary)",
 					},
@@ -113,9 +129,7 @@ function createThemeListener(currentWindow: WebviewWindow) {
 	});
 
 	onMount(async () => {
-		const unlisten = await currentWindow.onThemeChanged((_) =>
-			update(generalSettings.data?.theme),
-		);
+		const unlisten = await currentWindow.onThemeChanged((_) => update(generalSettings.data?.theme));
 		onCleanup(() => unlisten?.());
 	});
 
@@ -127,8 +141,7 @@ function createThemeListener(currentWindow: WebviewWindow) {
 		commands.setTheme(appTheme).then(() => {
 			document.documentElement.classList.toggle(
 				"dark",
-				appTheme === "dark" ||
-					window.matchMedia("(prefers-color-scheme: dark)").matches,
+				appTheme === "dark" || window.matchMedia("(prefers-color-scheme: dark)").matches,
 			);
 		});
 	}

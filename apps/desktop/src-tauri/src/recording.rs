@@ -39,14 +39,14 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_dialog::{DialogExt, MessageDialogBuilder};
 use tauri_specta::Event;
 use tracing::*;
 
 use crate::web_api::AuthedApiError;
 use crate::{
-    App, CurrentRecordingChanged, MutableState, NewStudioRecordingAdded, RecordingState,
+    App, CurrentRecordingChanged, MutableState, NewNotification, NewStudioRecordingAdded, RecordingState,
     RecordingStopped, VideoUploadInfo,
     api::PresignedS3PutRequestMethod,
     audio::AppSounds,
@@ -430,6 +430,17 @@ pub async fn start_recording(
                         }
                         Err(err) => {
                             error!("Error creating instant mode video: {err}");
+                            let _ = app.emit_to(
+                                tauri::EventTarget::WebviewWindow {
+                                    label: CapWindowId::Main.label(),
+                                },
+                                "new-notification",
+                                &NewNotification {
+                                    title: "Couldn't start recording".to_string(),
+                                    body: "Something went wrong. Please try again.".to_string(),
+                                    is_error: true,
+                                },
+                            );
                             return Err(err.to_string());
                         }
                     };

@@ -4,25 +4,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Inflight Recorder is a video messaging tool (fork of Cap, the open source Loom alternative). It's a Turborepo monorepo with a Tauri v2 desktop app (Rust + SolidStart) and a Next.js web app.
+Inflight Recorder is a desktop screen recording tool (fork of Cap, the open source Loom alternative). It's a Turborepo monorepo with a Tauri v2 desktop app (Rust + SolidStart).
 
-**Core Applications:**
-- `apps/web` — Next.js 15 (App Router) web application for sharing, management, dashboard
+**Application:**
 - `apps/desktop` — Tauri v2 desktop app with SolidStart (recording, editing)
-- `apps/cli` — Rust CLI tool
-- `apps/discord-bot` — Discord integration bot
-- `apps/storybook` — UI component documentation
 
 **Shared Packages:**
-- `packages/database` — Drizzle ORM (MySQL), auth utilities, email templates
-- `packages/ui` — React components for web
 - `packages/ui-solid` — SolidJS components for desktop
-- `packages/utils` — Shared utilities and types
-- `packages/env` — Zod-validated environment modules
-- `packages/web-domain` — Shared domain types (Video, User, Organisation, etc.)
-- `packages/web-backend` — Effect-based backend services (Videos, S3Buckets, Users, etc.)
-- `packages/web-api-contract` — ts-rest API contracts for desktop
-- `packages/web-api-contract-effect` — Effect-based HTTP API contracts
+- `packages/web-api-contract` — ts-rest API contracts for desktop license/API communication
+- `packages/config` — Shared TypeScript and Vite configuration
+- `packages/tsconfig` — Base TypeScript configuration
 
 **Rust Crates** (`crates/*`):
 - `recording` — Core recording functionality
@@ -44,11 +35,8 @@ pnpm cap-setup            # Install native dependencies (FFmpeg, etc.)
 
 ### Development
 ```bash
-pnpm dev                  # Start web + desktop + Docker services (Unix)
-pnpm dev:windows          # Start web + desktop + Docker services (Windows)
-pnpm dev:web              # Web only (starts Docker for MySQL/MinIO)
-pnpm dev:desktop          # Desktop only
-cd apps/web && pnpm dev   # Web without Docker
+pnpm dev                  # Start desktop app
+pnpm dev:desktop          # Start desktop app (alias)
 pnpm with-env -- <cmd>    # Run any command with .env loaded
 ```
 
@@ -64,26 +52,6 @@ cargo build -p <crate>    # Build specific Rust crate
 cargo test -p <crate>     # Test specific Rust crate
 ```
 
-### Database
-```bash
-pnpm db:generate          # Generate Drizzle migrations
-pnpm db:push              # Push schema to MySQL
-pnpm db:studio            # Open Drizzle Studio
-```
-
-### Docker
-```bash
-pnpm docker:up            # Start MySQL/MinIO containers
-pnpm docker:stop          # Stop containers
-pnpm docker:clean         # Remove containers and volumes
-```
-
-### Analytics (Tinybird)
-```bash
-pnpm analytics:setup      # Provision Tinybird data sources (destructive)
-pnpm analytics:check      # Validate Tinybird schema
-```
-
 ## Critical Rules
 
 ### Auto-generated Files (NEVER EDIT)
@@ -97,9 +65,6 @@ Never add comments (`//`, `/* */`, `///`, `//!`, `#`, etc.) to any code. Code mu
 ### Server Management
 Do not start additional dev servers unless asked. Assume the developer already has the environment running.
 
-### Database Changes
-Always run: `pnpm db:generate` → `pnpm db:push` → test
-
 ### Desktop Permissions (macOS)
 When running from terminal, grant screen/mic permissions to the terminal app, not the Inflight app.
 
@@ -108,28 +73,10 @@ When running from terminal, grant screen/mic permissions to the terminal app, no
 ### Technology Stack
 - **Package Manager**: pnpm 10.30.3
 - **Node**: 20+
-- **Rust**: 1.93+ (edition 2024)
+- **Rust**: 1.88+
 - **Build**: Turborepo
-- **Frontend (Web)**: React 19 + Next.js 15 (App Router)
 - **Desktop**: Tauri v2, SolidStart, Solid.js
-- **Database**: MySQL (PlanetScale) with Drizzle ORM
-- **Storage**: S3-compatible (AWS, Cloudflare R2, MinIO for local)
-- **AI**: Groq (primary) + OpenAI (fallback) — Server Actions only
-
-### Server Actions (Web)
-```typescript
-"use server";
-
-import { db } from "@inflight/database";
-import { getCurrentUser } from "@inflight/database/auth/session";
-import { videos } from "@inflight/database/schema";
-
-export async function updateVideo(videoId: string, title: string) {
-  const user = await getCurrentUser();
-  if (!user?.id) throw new Error("Unauthorized");
-  return await db().update(videos).set({ name: title }).where(eq(videos.id, videoId));
-}
-```
+- **UI**: `@inflight/ui-solid` (SolidJS + Kobalte + TailwindCSS)
 
 ### Desktop IPC (Tauri + specta)
 Rust emit:
@@ -150,47 +97,10 @@ await events.uploadProgress.listen((event) => {
 });
 ```
 
-### Effect System (API Routes)
-API routes use `@effect/platform`'s `HttpApi` pattern. The main handler in `apps/web/app/api/[[...route]]/route.ts`:
-```typescript
-import { HttpApiScalar } from "@effect/platform";
-import { HttpLive } from "@inflight/web-backend";
-import { Layer } from "effect";
-import { apiToHandler } from "@/lib/server";
-
-const handler = apiToHandler(
-  HttpApiScalar.layer({ path: "/api" }).pipe(Layer.provideMerge(HttpLive)),
-);
-export const GET = handler;
-export const POST = handler;
-```
-
-Backend services are in `packages/web-backend/src/` organized by domain (Videos, Users, S3Buckets, etc.).
-Run server effects through `runPromise` from `apps/web/lib/server.ts`.
-
-### React Query Pattern
-```typescript
-const { data, isLoading } = useQuery({
-  queryKey: ["videos", userId],
-  queryFn: () => getUserVideos(),
-  staleTime: 5 * 60 * 1000,
-});
-```
-
-## Important File Patterns
-
-- `apps/web/actions/**/*.ts` — Server Actions ("use server")
-- `packages/database/schema.ts` — Database schema
-- `apps/web/app/api/*` — API routes (Effect-based)
-- `packages/web-backend/src/` — Backend services (Videos, Users, S3Buckets, Folders, etc.)
-- `packages/web-domain/` — Shared domain types
-- `apps/web/lib/server.ts` — Effect runtime and `apiToHandler` utility
-
 ## Conventions
 
 - **Directory naming**: lower-case-dashed
 - **Components**: PascalCase
-- **Hooks**: camelCase starting with `use`
 - **Rust modules**: snake_case
 - **Rust crates**: kebab-case
 - **Files**: kebab-case (`user-menu.tsx`)

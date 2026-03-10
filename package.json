@@ -26,5 +26,10 @@
 	"name": "inflight",
 	"engines": {
 		"node": ">=20"
+	},
+	"pnpm": {
+		"overrides": {
+			"diff@>=8": ">=8.0.3"
+		}
 	}
 }

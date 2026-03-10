@@ -66,7 +66,7 @@ export async function transcribeVideo(
 		result.orgSettings?.disableTranscript
 	) {
 		console.log(
-			`[transcribeVideo] Transcription disabled for video ${videoId}`,
+			"[transcribeVideo] Transcription disabled for video:", videoId,
 		);
 		try {
 			await db()
@@ -171,29 +171,33 @@ export async function transcribeVideo(
 			.where(eq(videos.id, videoId));
 
 		console.log(
-			`[transcribeVideo] Transcription completed for video ${videoId}`,
+			"[transcribeVideo] Transcription completed for video:", videoId,
 		);
 
 		if (aiGenerationEnabled) {
 			console.log(
-				`[transcribeVideo] AI generation enabled, triggering AI metadata generation for video ${videoId}`,
+				"[transcribeVideo] AI generation enabled, triggering AI metadata generation for video:",
+				videoId,
 			);
 			try {
 				generateAiMetadata(videoId, userId).catch((error) => {
 					console.error(
-						`[transcribeVideo] Error generating AI metadata for video ${videoId}:`,
+						"[transcribeVideo] Error generating AI metadata for video:",
+						videoId,
 						error,
 					);
 				});
 			} catch (error) {
 				console.error(
-					`[transcribeVideo] Error starting AI metadata generation for video ${videoId}:`,
+					"[transcribeVideo] Error starting AI metadata generation for video:",
+					videoId,
 					error,
 				);
 			}
 		} else {
 			console.log(
-				`[transcribeVideo] AI generation disabled, skipping AI metadata generation for video ${videoId}`,
+				"[transcribeVideo] AI generation disabled, skipping AI metadata generation for video:",
+				videoId,
 			);
 		}
 

@@ -47,10 +47,16 @@ const ensureAnalyticsSessionId = () => {
 			const parsed = JSON.parse(raw) as { value: string; expiry: number };
 			if (parsed?.value && parsed.expiry > now) return parsed.value;
 		}
-		const newId =
-			typeof crypto !== "undefined" && "randomUUID" in crypto
-				? crypto.randomUUID()
-				: Math.random().toString(36).slice(2);
+		let newId: string;
+		try {
+			newId = crypto.randomUUID();
+		} catch {
+			const bytes = new Uint8Array(16);
+			crypto.getRandomValues(bytes);
+			newId = Array.from(bytes, (b) =>
+				b.toString(16).padStart(2, "0"),
+			).join("");
+		}
 		window.localStorage.setItem(
 			SESSION_STORAGE_KEY,
 			JSON.stringify({ value: newId, expiry: now + SESSION_TTL_MS }),

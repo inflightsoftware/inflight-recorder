@@ -280,7 +280,7 @@ ${transcriptText}`;
 				.where(eq(videos.id, videoId));
 		}
 	} catch (error) {
-		console.error(`[generateAiMetadata] Error for video ${videoId}:`, error);
+		console.error("[generateAiMetadata] Error for video:", videoId, error);
 
 		try {
 			const currentVideo = await db()

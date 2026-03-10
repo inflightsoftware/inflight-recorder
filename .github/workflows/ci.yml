@@ -6,6 +6,9 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
@@ -109,6 +112,7 @@ jobs:
     runs-on: ${{ matrix.settings.runner }}
     permissions:
       contents: read
+      checks: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

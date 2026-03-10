@@ -1,6 +1,17 @@
+const DOMAIN_PATTERN = /^([a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
+
+function validateDomain(domain: string): string {
+	const sanitized = domain.toLowerCase().trim();
+	if (!DOMAIN_PATTERN.test(sanitized)) {
+		throw new Error("Invalid domain format");
+	}
+	return encodeURIComponent(sanitized);
+}
+
 export const getConfigResponse = async (domain: string) => {
+	const safeDomain = validateDomain(domain);
 	const response = await fetch(
-		`https://api.vercel.com/v6/domains/${domain.toLowerCase()}/config?teamId=${
+		`https://api.vercel.com/v6/domains/${safeDomain}/config?teamId=${
 			process.env.VERCEL_TEAM_ID
 		}&strict=true`,
 		{
@@ -16,10 +27,11 @@ export const getConfigResponse = async (domain: string) => {
 };
 
 export const getDomainResponse = async (domain: string) => {
+	const safeDomain = validateDomain(domain);
 	const response = await fetch(
 		`https://api.vercel.com/v9/projects/${
 			process.env.VERCEL_PROJECT_ID
-		}/domains/${domain.toLowerCase()}?teamId=${process.env.VERCEL_TEAM_ID}`,
+		}/domains/${safeDomain}?teamId=${process.env.VERCEL_TEAM_ID}`,
 		{
 			method: "GET",
 			headers: {
@@ -33,10 +45,11 @@ export const getDomainResponse = async (domain: string) => {
 };
 
 export const verifyDomain = async (domain: string) => {
+	const safeDomain = validateDomain(domain);
 	const response = await fetch(
 		`https://api.vercel.com/v9/projects/${
 			process.env.VERCEL_PROJECT_ID
-		}/domains/${domain.toLowerCase()}/verify?teamId=${
+		}/domains/${safeDomain}/verify?teamId=${
 			process.env.VERCEL_TEAM_ID
 		}&strict=true`,
 		{
@@ -51,6 +64,7 @@ export const verifyDomain = async (domain: string) => {
 };
 
 export const addDomain = async (domain: string) => {
+	const safeDomain = validateDomain(domain);
 	const response = await fetch(
 		`https://api.vercel.com/v9/projects/${process.env.VERCEL_PROJECT_ID}/domains?teamId=${process.env.VERCEL_TEAM_ID}`,
 		{
@@ -59,7 +73,7 @@ export const addDomain = async (domain: string) => {
 				Authorization: `Bearer ${process.env.VERCEL_AUTH_TOKEN}`,
 				"Content-Type": "application/json",
 			},
-			body: JSON.stringify({ name: domain }),
+			body: JSON.stringify({ name: safeDomain }),
 			cache: "no-store",
 		},
 	).then((res) => res.json());
@@ -68,10 +82,10 @@ export const addDomain = async (domain: string) => {
 };
 
 export const getRequiredConfig = async (domain: string) => {
-	// First try to get the records directly
+	const safeDomain = validateDomain(domain);
 	try {
 		const recordsResponse = await fetch(
-			`https://api.vercel.com/v4/domains/${domain.toLowerCase()}/records?limit=10&teamId=${
+			`https://api.vercel.com/v4/domains/${safeDomain}/records?limit=10&teamId=${
 				process.env.VERCEL_TEAM_ID
 			}`,
 			{
@@ -101,9 +115,8 @@ export const getRequiredConfig = async (domain: string) => {
 		// Continue to fallback
 	}
 
-	// Fallback to the old config endpoint
 	const response = await fetch(
-		`https://api.vercel.com/v6/domains/${domain.toLowerCase()}/config?teamId=${
+		`https://api.vercel.com/v6/domains/${safeDomain}/config?teamId=${
 			process.env.VERCEL_TEAM_ID
 		}`,
 		{
@@ -132,7 +145,7 @@ export const getRequiredConfig = async (domain: string) => {
 
 		if (projectResponse.domains) {
 			const projectDomain = projectResponse.domains.find(
-				(d: any) => d.name === domain,
+				(d: any) => d.name === safeDomain,
 			);
 			if (projectDomain?.apexValue) {
 				response.aValues = [projectDomain.apexValue];

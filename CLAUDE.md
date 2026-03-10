@@ -44,10 +44,12 @@ pnpm cap-setup            # Install native dependencies (FFmpeg, etc.)
 
 ### Development
 ```bash
-pnpm dev                  # Start web + desktop + Docker services
+pnpm dev                  # Start web + desktop + Docker services (Unix)
+pnpm dev:windows          # Start web + desktop + Docker services (Windows)
 pnpm dev:web              # Web only (starts Docker for MySQL/MinIO)
 pnpm dev:desktop          # Desktop only
 cd apps/web && pnpm dev   # Web without Docker
+pnpm with-env -- <cmd>    # Run any command with .env loaded
 ```
 
 ### Build & Quality
@@ -104,9 +106,9 @@ When running from terminal, grant screen/mic permissions to the terminal app, no
 ## Architecture Patterns
 
 ### Technology Stack
-- **Package Manager**: pnpm 10.5.2
+- **Package Manager**: pnpm 10.30.3
 - **Node**: 20+
-- **Rust**: 1.88+
+- **Rust**: 1.93+ (edition 2024)
 - **Build**: Turborepo
 - **Frontend (Web)**: React 19 + Next.js 15 (App Router)
 - **Desktop**: Tauri v2, SolidStart, Solid.js

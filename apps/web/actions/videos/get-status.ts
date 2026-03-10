@@ -48,12 +48,14 @@ export async function getVideoStatus(
 
 	if (!video.transcriptionStatus && serverEnv().DEEPGRAM_API_KEY) {
 		console.log(
-			`[Get Status] Transcription not started for video ${videoId}, triggering transcription`,
+			"[Get Status] Transcription not started for video, triggering transcription. videoId:",
+			videoId,
 		);
 		try {
 			transcribeVideo(videoId, video.ownerId).catch((error) => {
 				console.error(
-					`[Get Status] Error starting transcription for video ${videoId}:`,
+					"[Get Status] Error starting transcription for video:",
+					videoId,
 					error,
 				);
 			});
@@ -68,7 +70,8 @@ export async function getVideoStatus(
 			};
 		} catch (error) {
 			console.error(
-				`[Get Status] Error triggering transcription for video ${videoId}:`,
+				"[Get Status] Error triggering transcription for video:",
+				videoId,
 				error,
 			);
 			return {

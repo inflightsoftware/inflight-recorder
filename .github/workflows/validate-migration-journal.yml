@@ -5,6 +5,9 @@ on:
     paths:
       - "packages/database/migrations/**"
 
+permissions:
+  contents: read
+
 jobs:
   validate-journal:
     runs-on: ubuntu-latest

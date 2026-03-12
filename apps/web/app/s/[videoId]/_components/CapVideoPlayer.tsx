@@ -84,8 +84,9 @@ export function CapVideoPlayer({
 	const [hasError, setHasError] = useState(false);
 	const [isRetrying, setIsRetrying] = useState(false);
 	const isRetryingRef = useRef(false);
-	const maxRetries = 3;
+	const maxRetries = 5;
 	const [duration, setDuration] = useState(0);
+	const [forceCheckUpload, setForceCheckUpload] = useState(false);
 
 	useEffect(() => {
 		const checkMobile = () => {
@@ -100,7 +101,7 @@ export function CapVideoPlayer({
 
 	const uploadProgressRaw = useUploadProgress(
 		videoId,
-		hasActiveUpload || false,
+		hasActiveUpload || forceCheckUpload || false,
 	);
 	// if the video comes back from S3, just ignore the upload progress.
 	const uploadProgress = videoLoaded ? null : uploadProgressRaw;
@@ -123,6 +124,12 @@ export function CapVideoPlayer({
 								method: "GET",
 								headers: { range: "bytes=0-0" },
 							});
+
+							if (response.status === 404) {
+								setForceCheckUpload(true);
+								throw new Error("Video not available yet");
+							}
+
 							const finalUrl = response.redirected
 								? response.url
 								: urlWithTimestamp;
@@ -163,6 +170,8 @@ export function CapVideoPlayer({
 						}
 					},
 		refetchOnWindowFocus: false,
+		retry: 3,
+		retryDelay: (attempt) => Math.min(2000 * 2 ** attempt, 15000),
 	});
 
 	const reloadVideo = useCallback(async () => {
@@ -208,8 +217,8 @@ export function CapVideoPlayer({
 		}
 
 		const elapsedMs = Date.now() - startTime.current;
-		if (elapsedMs > 60000) {
-			console.error("Video failed to load after 1 minute");
+		if (elapsedMs > 120000) {
+			console.error("Video failed to load after 2 minutes");
 			setHasError(true);
 			isRetryingRef.current = false;
 			setIsRetrying(false);
@@ -218,11 +227,13 @@ export function CapVideoPlayer({
 
 		let retryInterval: number;
 		if (retryCount.current === 0) {
-			retryInterval = 2000; // 2 seconds
+			retryInterval = 2000;
 		} else if (retryCount.current === 1) {
-			retryInterval = 5000; // 5 seconds
+			retryInterval = 4000;
+		} else if (retryCount.current === 2) {
+			retryInterval = 8000;
 		} else {
-			retryInterval = 10000; // 10 seconds
+			retryInterval = 15000;
 		}
 
 		console.log(
@@ -241,6 +252,7 @@ export function CapVideoPlayer({
 		setHasError(false);
 		isRetryingRef.current = false;
 		setIsRetrying(false);
+		setForceCheckUpload(false);
 		retryCount.current = 0;
 		startTime.current = Date.now();
 
@@ -327,7 +339,7 @@ export function CapVideoPlayer({
 			const error = (e.target as HTMLVideoElement).error;
 			console.error("CapVideoPlayer: Video error detected:", error);
 			if (!videoLoaded && !hasError) {
-				// Set both ref and state immediately to prevent any flash of error UI
+				setForceCheckUpload(true);
 				isRetryingRef.current = true;
 				setIsRetrying(true);
 				setHasError(false);

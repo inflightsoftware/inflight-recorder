@@ -22,15 +22,20 @@ const CURSOR_MIN_MOTION_PX: f32 = 1.0;
 const CURSOR_BASELINE_FPS: f32 = 60.0;
 const CURSOR_MULTIPLIER: f32 = 3.0;
 const CURSOR_MAX_STRENGTH: f32 = 5.0;
+const VELOCITY_BLEND_RATIO: f32 = 0.7;
 
 /// The size to render the svg to.
 static SVG_CURSOR_RASTERIZED_HEIGHT: u32 = 200;
+
+const CIRCLE_CURSOR_SIZE: u32 = 256;
 
 pub struct CursorLayer {
     statics: Statics,
     bind_group: Option<BindGroup>,
     cursors: HashMap<String, CursorTexture>,
+    circle_cursor: Option<CursorTexture>,
     prev_is_svg_assets_enabled: Option<bool>,
+    prev_cursor_type: Option<CursorType>,
 }
 
 struct Statics {
@@ -98,7 +103,7 @@ impl Statics {
                 module: &shader,
                 entry_point: Some("fs_main"),
                 targets: &[Some(wgpu::ColorTargetState {
-                    format: wgpu::TextureFormat::Rgba8UnormSrgb,
+                    format: wgpu::TextureFormat::Rgba8Unorm,
                     blend: Some(wgpu::BlendState {
                         color: wgpu::BlendComponent {
                             src_factor: wgpu::BlendFactor::One,
@@ -187,8 +192,53 @@ impl CursorLayer {
             statics,
             bind_group: None,
             cursors: Default::default(),
+            circle_cursor: None,
             prev_is_svg_assets_enabled: None,
+            prev_cursor_type: None,
         }
+    }
+
+    fn create_circle_cursor(constants: &RenderVideoConstants) -> CursorTexture {
+        let size = CIRCLE_CURSOR_SIZE;
+        let mut rgba = vec![0u8; (size * size * 4) as usize];
+        let center = size as f32 / 2.0;
+        let outer_radius = center - size as f32 * 0.08;
+        let border_width = size as f32 * 0.025;
+        let edge_softness = size as f32 * 0.015;
+
+        let fill_alpha = 0.2_f32;
+        let border_alpha = 0.55_f32;
+
+        for y in 0..size {
+            for x in 0..size {
+                let dx = x as f32 - center + 0.5;
+                let dy = y as f32 - center + 0.5;
+                let dist = (dx * dx + dy * dy).sqrt();
+                let idx = ((y * size + x) * 4) as usize;
+
+                if dist <= outer_radius + edge_softness {
+                    let outer_fade = 1.0 - ((dist - outer_radius) / edge_softness).clamp(0.0, 1.0);
+
+                    let border_start = outer_radius - border_width;
+                    let border_factor = if dist >= border_start {
+                        ((dist - border_start) / border_width).clamp(0.0, 1.0)
+                    } else {
+                        0.0
+                    };
+
+                    let base_alpha = fill_alpha + border_factor * (border_alpha - fill_alpha);
+                    let alpha = base_alpha * outer_fade;
+
+                    let premul = (255.0 * alpha) as u8;
+                    rgba[idx] = premul;
+                    rgba[idx + 1] = premul;
+                    rgba[idx + 2] = premul;
+                    rgba[idx + 3] = premul;
+                }
+            }
+        }
+
+        CursorTexture::prepare(constants, &rgba, (size, size), XY::new(0.5, 0.5))
     }
 
     pub fn prepare(
@@ -219,21 +269,35 @@ impl CursorLayer {
         let cursor_strength = (uniforms.motion_blur_amount * CURSOR_MULTIPLIER * fps_scale)
             .clamp(0.0, CURSOR_MAX_STRENGTH);
         let parent_motion = uniforms.display_parent_motion_px;
-        let child_motion = uniforms
-            .prev_cursor
-            .as_ref()
-            .filter(|prev| prev.cursor_id == interpolated_cursor.cursor_id)
-            .map(|prev| {
-                let delta_uv = XY::new(
-                    (interpolated_cursor.position.coord.x - prev.position.coord.x) as f32,
-                    (interpolated_cursor.position.coord.y - prev.position.coord.y) as f32,
-                );
-                XY::new(
-                    delta_uv.x * screen_size.x as f32,
-                    delta_uv.y * screen_size.y as f32,
-                )
-            })
-            .unwrap_or_else(|| XY::new(0.0, 0.0));
+        let child_motion = {
+            let delta_motion = uniforms
+                .prev_cursor
+                .as_ref()
+                .filter(|prev| prev.cursor_id == interpolated_cursor.cursor_id)
+                .map(|prev| {
+                    let delta_uv = XY::new(
+                        (interpolated_cursor.position.coord.x - prev.position.coord.x) as f32,
+                        (interpolated_cursor.position.coord.y - prev.position.coord.y) as f32,
+                    );
+                    XY::new(
+                        delta_uv.x * screen_size.x as f32,
+                        delta_uv.y * screen_size.y as f32,
+                    )
+                })
+                .unwrap_or_else(|| XY::new(0.0, 0.0));
+
+            let spring_velocity = XY::new(
+                interpolated_cursor.velocity.x * screen_size.x as f32 / fps,
+                interpolated_cursor.velocity.y * screen_size.y as f32 / fps,
+            );
+
+            XY::new(
+                delta_motion.x * (1.0 - VELOCITY_BLEND_RATIO)
+                    + spring_velocity.x * VELOCITY_BLEND_RATIO,
+                delta_motion.y * (1.0 - VELOCITY_BLEND_RATIO)
+                    + spring_velocity.y * VELOCITY_BLEND_RATIO,
+            )
+        };
 
         let combined_motion_px = if cursor_strength <= f32::EPSILON {
             XY::new(0.0, 0.0)
@@ -270,71 +334,84 @@ impl CursorLayer {
             }
         }
 
-        // Remove all cursor assets if the svg configuration changes.
-        // it might change the texture.
-        //
-        // This would be better if it only invalidated the required assets but that would be more complicated.
+        let cursor_type = uniforms.project.cursor.cursor_type().clone();
+
+        if self.prev_cursor_type.as_ref() != Some(&cursor_type) {
+            self.prev_cursor_type = Some(cursor_type.clone());
+            self.circle_cursor = None;
+        }
+
         if self.prev_is_svg_assets_enabled != Some(uniforms.project.cursor.use_svg) {
             self.prev_is_svg_assets_enabled = Some(uniforms.project.cursor.use_svg);
             self.cursors.drain();
         }
 
-        if !self.cursors.contains_key(&interpolated_cursor.cursor_id) {
-            let mut cursor = None;
+        let cursor_texture = if cursor_type == CursorType::Circle {
+            if self.circle_cursor.is_none() {
+                self.circle_cursor = Some(Self::create_circle_cursor(constants));
+            }
+            self.circle_cursor.as_ref().unwrap()
+        } else {
+            if !self.cursors.contains_key(&interpolated_cursor.cursor_id) {
+                let mut loaded_cursor = None;
 
-            let cursor_shape = match &constants.recording_meta.inner {
-                RecordingMetaInner::Studio(StudioRecordingMeta::MultipleSegments {
-                    inner:
-                        MultipleSegments {
-                            cursors: Cursors::Correct(cursors),
-                            ..
-                        },
-                }) => cursors
-                    .get(&interpolated_cursor.cursor_id)
-                    .and_then(|v| v.shape),
-                _ => None,
-            };
+                let cursor_shape = match &constants.recording_meta.inner {
+                    RecordingMetaInner::Studio(studio) => match studio.as_ref() {
+                        StudioRecordingMeta::MultipleSegments {
+                            inner:
+                                MultipleSegments {
+                                    cursors: Cursors::Correct(cursors),
+                                    ..
+                                },
+                        } => cursors
+                            .get(&interpolated_cursor.cursor_id)
+                            .and_then(|v| v.shape),
+                        _ => None,
+                    },
+                    _ => None,
+                };
 
-            // Attempt to find and load a higher-quality SVG cursor included in Cap.
-            // These are used instead of the OS provided cursor images when possible as the quality is better.
-            if let Some(cursor_shape) = cursor_shape
-                && uniforms.project.cursor.use_svg
-                && let Some(info) = cursor_shape.resolve()
-            {
-                cursor = CursorTexture::prepare_svg(constants, info.raw, info.hotspot.into())
-                    .map_err(|err| {
-                        error!(
-                            "Error loading SVG cursor {:?}: {err}",
-                            interpolated_cursor.cursor_id
-                        )
+                if let Some(cursor_shape) = cursor_shape
+                    && uniforms.project.cursor.use_svg
+                    && let Some(info) = cursor_shape.resolve()
+                {
+                    loaded_cursor =
+                        CursorTexture::prepare_svg(constants, info.raw, info.hotspot.into())
+                            .map_err(|err| {
+                                error!(
+                                    "Error loading SVG cursor {:?}: {err}",
+                                    interpolated_cursor.cursor_id
+                                )
+                            })
+                            .ok();
+                }
+
+                if let StudioRecordingMeta::MultipleSegments { inner, .. } = &constants.meta
+                    && loaded_cursor.is_none()
+                    && let Some(c) = inner
+                        .get_cursor_image(&constants.recording_meta, &interpolated_cursor.cursor_id)
+                    && let Ok(img) = image::open(&c.path).map_err(|err| {
+                        error!("Failed to load cursor image from {:?}: {err}", c.path)
                     })
-                    .ok();
-            }
+                {
+                    loaded_cursor = Some(CursorTexture::prepare(
+                        constants,
+                        &img.to_rgba8(),
+                        img.dimensions(),
+                        c.hotspot,
+                    ));
+                }
 
-            // If not we attempt to load the low-quality image cursor
-            if let StudioRecordingMeta::MultipleSegments { inner, .. } = &constants.meta
-                && cursor.is_none()
-                && let Some(c) = inner
-                    .get_cursor_image(&constants.recording_meta, &interpolated_cursor.cursor_id)
-                && let Ok(img) = image::open(&c.path)
-                    .map_err(|err| error!("Failed to load cursor image from {:?}: {err}", c.path))
-            {
-                cursor = Some(CursorTexture::prepare(
-                    constants,
-                    &img.to_rgba8(),
-                    img.dimensions(),
-                    c.hotspot,
-                ));
+                if let Some(c) = loaded_cursor {
+                    self.cursors
+                        .insert(interpolated_cursor.cursor_id.clone(), c);
+                }
             }
-
-            if let Some(cursor) = cursor {
-                self.cursors
-                    .insert(interpolated_cursor.cursor_id.clone(), cursor);
-            }
-        }
-        let Some(cursor_texture) = self.cursors.get(&interpolated_cursor.cursor_id) else {
-            error!("Cursor {:?} not found!", interpolated_cursor.cursor_id);
-            return;
+            let Some(tex) = self.cursors.get(&interpolated_cursor.cursor_id) else {
+                error!("Cursor {:?} not found!", interpolated_cursor.cursor_id);
+                return;
+            };
+            tex
         };
 
         let size = {
@@ -416,6 +493,12 @@ impl CursorLayer {
                 effective_strength,
                 cursor_opacity,
             ],
+            rotation_params: [
+                uniforms.project.cursor.rotation_amount,
+                uniforms.project.cursor.base_rotation,
+                0.0,
+                0.0,
+            ],
         };
 
         constants.queue.write_buffer(
@@ -473,6 +556,7 @@ pub struct CursorUniforms {
     output_size: [f32; 4],
     screen_bounds: [f32; 4],
     motion_vector_strength: [f32; 4],
+    rotation_params: [f32; 4],
 }
 
 fn compute_cursor_idle_opacity(
@@ -618,7 +702,7 @@ impl CursorTexture {
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8UnormSrgb,
+            format: wgpu::TextureFormat::Rgba8Unorm,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
             view_formats: &[],
         });

@@ -1,6 +1,11 @@
 [workspace]
 resolver = "2"
-members = ["apps/cli", "apps/desktop/src-tauri", "crates/*", "crates/workspace-hack"]
+members = [
+    "apps/cli",
+    "apps/desktop/src-tauri",
+    "crates/*",
+    "crates/workspace-hack",
+]
 
 [workspace.dependencies]
 anyhow = { version = "1.0.86" }
@@ -22,15 +27,19 @@ specta = { version = "=2.0.0-rc.20", features = [
     "derive",
     "serde_json",
     "uuid",
+    "chrono"
 ] }
 serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 
 nokhwa = { git = "https://github.com/CapSoftware/nokhwa", rev = "b9c8079e82e2", features = [
     "input-native",
     "serialize",
 ] }
 nokhwa-bindings-macos = { git = "https://github.com/CapSoftware/nokhwa", rev = "b9c8079e82e2" }
-wgpu = "25.0.0"
+wgpu = { version = "25.0.0", features = ["wgpu-core"] }
+wgpu-hal = "25.0.2"
+wgpu-core = "25.0.0"
 flume = "0.11.0"
 thiserror = "1.0"
 sentry = { version = "0.42.0", features = [
@@ -40,17 +49,22 @@ sentry = { version = "0.42.0", features = [
 ] }
 tracing = "0.1.41"
 futures = "0.3.31"
+aho-corasick = "1.1.4"
 
 cidre = { git = "https://github.com/CapSoftware/cidre", rev = "bf84b67079a8", features = [
     "macos_12_7",
     "cv",
     "cf",
+    "cg",
     "core_audio",
     "sc",
     "av",
     "blocks",
     "async",
     "dispatch",
+    "io_surface",
+    "mtl",
+    "vt",
 ], default-features = false }
 
 windows = "0.60.0"
@@ -58,6 +72,7 @@ windows-core = "0.60"
 windows-sys = "0.59.0"
 windows-capture = "1.5.0"
 percent-encoding = "2.3.1"
+sysinfo = "0.32"
 
 # TODO: Reenable these: https://github.com/CapSoftware/Cap/issues/859
 [workspace.lints.rust]
@@ -81,7 +96,7 @@ manual_clamp = "deny"
 
 # Optimize for smaller binary size
 [profile.release]
-panic = "abort"   # Strip expensive panic clean-up logic
+panic = "abort"
 codegen-units = 1 # Compile crates one after another so the compiler can optimize better
 lto = true        # Enables link to optimizations
 opt-level = "s"   # Optimize for binary size

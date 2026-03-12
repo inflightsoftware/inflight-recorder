@@ -912,17 +912,13 @@ function Page() {
 
 	const handleTargetModeClick = async (mode: "display" | "window" | "area") => {
 		if (isRecording() || isOverlayLoading()) return;
-		const nextMode = rawOptions.targetMode === mode ? null : mode;
-		setOptions("targetMode", nextMode);
-		if (nextMode) {
-			setIsOverlayLoading(true);
-			try {
-				await commands.openTargetSelectOverlays(null);
-			} finally {
-				setIsOverlayLoading(false);
-			}
-		} else {
-			commands.closeTargetSelectOverlays();
+		if (rawOptions.targetMode === mode) return;
+		setOptions("targetMode", mode);
+		setIsOverlayLoading(true);
+		try {
+			await commands.openTargetSelectOverlays(null);
+		} finally {
+			setIsOverlayLoading(false);
 		}
 	};
 
@@ -1171,9 +1167,25 @@ function Page() {
 			data-tauri-drag-region
 		>
 			<div class="flex-1 min-h-0 w-full flex flex-col">
-				<Show when={signIn.isPending}>
-					<div class="flex absolute inset-0 justify-center items-center bg-gray-1 animate-in fade-in">
+				{signIn.isPending && (
+					<div class="flex absolute inset-0 z-50 justify-center items-center bg-gray-1">
 						<div class="flex flex-col gap-4 justify-center items-center">
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								width="24"
+								height="16"
+								viewBox="0 0 19 13"
+								fill="none"
+							>
+								<path
+									d="M8.01611 0.875977C8.34473 0.595515 8.85217 0.828258 8.85205 1.25977L8.84912 11.5254C8.84877 12.0566 8.13224 12.2275 7.89111 11.7539L5.76807 7.58008C5.66152 7.37057 5.42443 7.26132 5.1958 7.31738L0.629395 8.43848C0.111463 8.56526 -0.225229 7.90947 0.180176 7.56348L8.01611 0.875977Z"
+									fill="black"
+								/>
+								<path
+									d="M9.74951 1.25879C9.74823 0.827379 10.2541 0.592778 10.5835 0.87207L18.438 7.53906C18.8444 7.88401 18.5091 8.5406 17.9907 8.41504L13.4214 7.30664C13.1927 7.2512 12.9561 7.36066 12.8501 7.57031L10.7378 11.75C10.498 12.2242 9.78173 12.0555 9.77979 11.5244L9.74951 1.25879Z"
+									fill="black"
+								/>
+							</svg>
 							<span>Signing In...</span>
 
 							<Button
@@ -1188,7 +1200,7 @@ function Page() {
 							</Button>
 						</div>
 					</div>
-				</Show>
+				)}
 				<Show when={!signIn.isPending}>
 					<Show when={activeMenu()} keyed fallback={<TargetSelectionHome />}>
 						{(variant) =>

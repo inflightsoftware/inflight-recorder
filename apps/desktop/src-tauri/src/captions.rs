@@ -1814,7 +1814,10 @@ pub async fn save_captions(
         "position".to_string(),
         serde_json::Value::String(settings.position.clone()),
     );
-    settings_obj.insert("bold".to_string(), serde_json::Value::Bool(settings.bold));
+    settings_obj.insert(
+        "fontWeight".to_string(),
+        serde_json::Value::Number(serde_json::Number::from(settings.font_weight)),
+    );
     settings_obj.insert(
         "italic".to_string(),
         serde_json::Value::Bool(settings.italic),
@@ -1852,6 +1855,10 @@ pub async fn save_captions(
         serde_json::Value::Number(
             serde_json::Number::from_f64(settings.word_transition_duration as f64).unwrap(),
         ),
+    );
+    settings_obj.insert(
+        "activeWordHighlight".to_string(),
+        serde_json::Value::Bool(settings.active_word_highlight),
     );
 
     json_obj.insert(
@@ -1951,10 +1958,11 @@ pub fn parse_captions_json(json: &str) -> Result<cap_project::CaptionsData, Stri
                         .and_then(|v| v.as_str())
                         .unwrap_or("bottom")
                         .to_string();
-                    let bold = settings_obj
-                        .get("bold")
-                        .and_then(|v| v.as_bool())
-                        .unwrap_or(false);
+                    let font_weight = settings_obj
+                        .get("fontWeight")
+                        .or_else(|| settings_obj.get("font_weight"))
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(700) as u32;
                     let italic = settings_obj
                         .get("italic")
                         .and_then(|v| v.as_bool())
@@ -2002,6 +2010,12 @@ pub fn parse_captions_json(json: &str) -> Result<cap_project::CaptionsData, Stri
                         .and_then(|v| v.as_f64())
                         .unwrap_or(0.25) as f32;
 
+                    let active_word_highlight = settings_obj
+                        .get("activeWordHighlight")
+                        .or_else(|| settings_obj.get("active_word_highlight"))
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false);
+
                     cap_project::CaptionSettings {
                         enabled,
                         font,
@@ -2010,7 +2024,7 @@ pub fn parse_captions_json(json: &str) -> Result<cap_project::CaptionsData, Stri
                         background_color,
                         background_opacity,
                         position,
-                        bold,
+                        font_weight,
                         italic,
                         outline,
                         outline_color,
@@ -2019,6 +2033,7 @@ pub fn parse_captions_json(json: &str) -> Result<cap_project::CaptionsData, Stri
                         fade_duration,
                         linger_duration,
                         word_transition_duration,
+                        active_word_highlight,
                     }
                 } else {
                     cap_project::CaptionSettings::default()

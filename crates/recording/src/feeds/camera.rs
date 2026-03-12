@@ -461,7 +461,7 @@ async fn setup_camera(
 ) -> Result<SetupCameraResult, SetInputError> {
     let camera = find_camera(id).ok_or(SetInputError::DeviceNotFound)?;
     let format = select_camera_format(&camera)?;
-    let frame_rate = format.frame_rate() as u32;
+    let frame_rate = format.frame_rate().round().max(1.0) as u32;
 
     let (ready_tx, ready_rx) = oneshot::channel();
     let mut ready_signal = Some(ready_tx);
@@ -477,7 +477,7 @@ async fn setup_camera(
 
             let _ = native_recipient
                 .tell(NewNativeFrame(NativeCameraFrame {
-                    sample_buf: frame.native().sample_buf().retained(),
+                    sample_buf: frame.native().sample_buf().clone(),
                     timestamp,
                 }))
                 .try_send();
@@ -506,15 +506,7 @@ async fn setup_camera(
                 }))
                 .try_send();
 
-            if callback_num % 30 == 0 {
-                tracing::debug!(
-                    "Camera callback: sent frame {} to actor, result={:?}",
-                    callback_num,
-                    send_result.is_ok()
-                );
-            }
-
-            if send_result.is_err() && callback_num % 30 == 0 {
+            if send_result.is_err() && callback_num.is_multiple_of(30) {
                 tracing::warn!(
                     "Camera callback: failed to send frame {} to actor (mailbox full?)",
                     callback_num
@@ -543,7 +535,7 @@ async fn setup_camera(
 ) -> Result<SetupCameraResult, SetInputError> {
     let camera = find_camera(id).ok_or(SetInputError::DeviceNotFound)?;
     let format = select_camera_format(&camera)?;
-    let frame_rate = format.frame_rate() as u32;
+    let frame_rate = format.frame_rate().round().max(1.0) as u32;
 
     let (ready_tx, ready_rx) = oneshot::channel();
     let mut ready_signal = Some(ready_tx);
@@ -564,8 +556,8 @@ async fn setup_camera(
                 let data_len = bytes.len();
                 if let Ok(buffer) = unsafe { MFCreateMemoryBuffer(data_len as u32) } {
                     let buffer_ready = {
-                        if let Ok(mut lock) = buffer.lock() {
-                            lock.copy_from_slice(&*bytes);
+                        if let Ok(mut lock) = buffer.lock_for_write() {
+                            lock.copy_from_slice(&bytes);
                             true
                         } else {
                             false
@@ -575,12 +567,15 @@ async fn setup_camera(
                     if buffer_ready {
                         let _ = unsafe { buffer.SetCurrentLength(data_len as u32) };
 
+                        #[allow(clippy::arc_with_non_send_sync)]
+                        let buffer = std::sync::Arc::new(std::sync::Mutex::new(buffer));
                         let _ = native_recipient
                             .tell(NewNativeFrame(NativeCameraFrame {
-                                buffer: std::sync::Arc::new(std::sync::Mutex::new(buffer)),
+                                buffer,
                                 pixel_format: frame.native().pixel_format,
                                 width: frame.native().width as u32,
                                 height: frame.native().height as u32,
+                                is_bottom_up: frame.native().is_bottom_up,
                                 timestamp,
                             }))
                             .try_send();
@@ -612,15 +607,7 @@ async fn setup_camera(
                 }))
                 .try_send();
 
-            if callback_num % 30 == 0 {
-                tracing::debug!(
-                    "Camera callback: sent frame {} to actor, result={:?}",
-                    callback_num,
-                    send_result.is_ok()
-                );
-            }
-
-            if send_result.is_err() && callback_num % 30 == 0 {
+            if send_result.is_err() && callback_num.is_multiple_of(30) {
                 tracing::warn!(
                     "Camera callback: failed to send frame {} to actor (mailbox full?)",
                     callback_num
@@ -717,6 +704,9 @@ impl Message<RemoveInput> for CameraFeed {
             let _ = attached.done_tx.send(());
         }
 
+        self.senders.clear();
+        self.native_senders.clear();
+
         for cb in &self.on_disconnect {
             (cb)();
         }
@@ -789,21 +779,13 @@ impl Message<NewFrame> for CameraFeed {
     async fn handle(&mut self, msg: NewFrame, _: &mut Context<Self, Self::Reply>) -> Self::Reply {
         let frame_num = CAMERA_FRAME_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
-        if frame_num % 30 == 0 {
-            debug!(
-                "CameraFeed: received frame {}, broadcasting to {} senders",
-                frame_num,
-                self.senders.len()
-            );
-        }
-
         let mut to_remove = vec![];
 
         for (i, sender) in self.senders.iter().enumerate() {
             match sender.try_send(msg.0.clone()) {
                 Ok(()) => {}
                 Err(flume::TrySendError::Full(_)) => {
-                    if frame_num % 30 == 0 {
+                    if frame_num.is_multiple_of(30) {
                         warn!(
                             "Camera sender {} channel full at frame {}, dropping frame",
                             i, frame_num
@@ -843,21 +825,13 @@ impl Message<NewNativeFrame> for CameraFeed {
         let frame_num =
             NATIVE_CAMERA_FRAME_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
-        if frame_num % 30 == 0 {
-            debug!(
-                "CameraFeed: received native frame {}, broadcasting to {} native senders",
-                frame_num,
-                self.native_senders.len()
-            );
-        }
-
         let mut to_remove = vec![];
 
         for (i, sender) in self.native_senders.iter().enumerate() {
             match sender.try_send(msg.0.clone()) {
                 Ok(()) => {}
                 Err(flume::TrySendError::Full(_)) => {
-                    if frame_num % 30 == 0 {
+                    if frame_num.is_multiple_of(30) {
                         warn!(
                             "Native camera sender {} channel full at frame {}, dropping frame",
                             i, frame_num

@@ -182,6 +182,7 @@ impl ScreenshotEditorInstances {
                         path: relative_path.clone(),
                         fps: 30,
                         start_time: Some(0.0),
+                        device_id: None,
                     };
                     let segment = SingleSegment {
                         display: video_meta.clone(),
@@ -195,7 +196,7 @@ impl ScreenshotEditorInstances {
                         project_path: path.parent().unwrap().to_path_buf(),
                         pretty_name: "Screenshot".to_string(),
                         sharing: None,
-                        inner: RecordingMetaInner::Studio(studio_meta.clone()),
+                        inner: RecordingMetaInner::Studio(Box::new(studio_meta.clone())),
                         upload: None,
                     }
                 };
@@ -250,9 +251,10 @@ impl ScreenshotEditorInstances {
                     queue: (*queue).clone(),
                     device: (*device).clone(),
                     options,
-                    meta: studio_meta,
+                    meta: *studio_meta,
                     recording_meta: recording_meta.clone(),
                     background_textures: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
+                    is_software_adapter: false,
                 };
 
                 let (config_tx, mut config_rx) = watch::channel(loaded_config.unwrap_or_default());
@@ -295,6 +297,12 @@ impl ScreenshotEditorInstances {
                         let (base_w, base_h) =
                             ProjectUniforms::get_base_size(&constants.options, &current_config);
 
+                        let zoom_focus_interpolator = cap_rendering::ZoomFocusInterpolator::new(
+                            &cap_project::CursorEvents::default(),
+                            None,
+                            current_config.screen_movement_spring,
+                            0.0,
+                        );
                         let uniforms = ProjectUniforms::new(
                             &constants,
                             &current_config,
@@ -303,6 +311,8 @@ impl ScreenshotEditorInstances {
                             cap_project::XY::new(base_w, base_h),
                             &cap_project::CursorEvents::default(),
                             &segment_frames,
+                            0.0,
+                            &zoom_focus_interpolator,
                         );
 
                         let rendered_frame = frame_renderer
@@ -315,14 +325,15 @@ impl ScreenshotEditorInstances {
                             .await;
 
                         match rendered_frame {
-                            Ok(frame) => {
+                            Ok(Some(frame)) => {
                                 let _ = frame_tx.send(Some(WSFrame {
-                                    data: frame.data,
+                                    data: frame.data.to_vec(),
                                     width: frame.width,
                                     height: frame.height,
                                     stride: frame.padded_bytes_per_row,
                                 }));
                             }
+                            Ok(None) => {}
                             Err(e) => {
                                 eprintln!("Failed to render frame: {e}");
                             }

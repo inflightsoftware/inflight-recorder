@@ -34,28 +34,18 @@ pub enum PostDeletionBehaviour {
 impl MainWindowRecordingStartBehaviour {
     pub fn perform(&self, window: &tauri::WebviewWindow) -> tauri::Result<()> {
         match self {
-            Self::Close => window.close(),
+            Self::Close => window.hide(),
             Self::Minimise => window.minimize(),
         }
     }
 }
 
-const DEFAULT_EXCLUDED_WINDOW_TITLES: &[&str] = &[
-    "Inflight",
-    "Inflight Settings",
-    "Inflight Recording Controls",
-    "Inflight Camera",
-];
-
 pub fn default_excluded_windows() -> Vec<WindowExclusion> {
-    DEFAULT_EXCLUDED_WINDOW_TITLES
-        .iter()
-        .map(|title| WindowExclusion {
-            bundle_identifier: None,
-            owner_name: None,
-            window_title: Some((*title).to_string()),
-        })
-        .collect()
+    vec![WindowExclusion {
+        bundle_identifier: Some("co.inflight.desktop.dev".to_string()),
+        owner_name: Some("Inflight".to_string()),
+        window_title: None,
+    }]
 }
 
 // When adding fields here, #[serde(default)] defines the value to use for existing configurations,
@@ -250,6 +240,15 @@ pub fn init(app: &AppHandle) {
     if !store.recording_picker_preference_set {
         store.enable_new_recording_flow = true;
         store.recording_picker_preference_set = true;
+    }
+
+    let has_old_title_exclusions = store.excluded_windows.iter().any(|e| {
+        e.bundle_identifier.is_none()
+            && e.owner_name.is_none()
+            && e.window_title.is_some()
+    });
+    if has_old_title_exclusions {
+        store.excluded_windows = default_excluded_windows();
     }
 
     if let Err(e) = store.save(app) {

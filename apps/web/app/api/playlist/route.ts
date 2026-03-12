@@ -6,9 +6,12 @@ import {
 	HttpApiGroup,
 	HttpServerResponse,
 } from "@effect/platform";
+import { db } from "@inflight/database";
+import { videoUploads } from "@inflight/database/schema";
 import { serverEnv } from "@inflight/env";
 import { provideOptionalAuth, S3Buckets, Videos } from "@inflight/web-backend";
 import { Video } from "@inflight/web-domain";
+import { eq } from "drizzle-orm";
 import { Effect, Layer, Option, Schema } from "effect";
 import { apiToHandler } from "@/lib/server";
 import { CACHE_CONTROL_HEADERS } from "@/utils/helpers";
@@ -56,6 +59,16 @@ const ApiLive = HttpApiBuilder.api(Api).pipe(
 									() => new HttpApiError.NotFound(),
 								),
 							);
+
+						const [activeUpload] = yield* Effect.promise(() =>
+							db()
+								.select({ videoId: videoUploads.videoId })
+								.from(videoUploads)
+								.where(eq(videoUploads.videoId, urlParams.videoId)),
+						);
+
+						if (activeUpload)
+							return yield* Effect.fail(new HttpApiError.NotFound());
 
 						return yield* getPlaylistResponse(video, urlParams);
 					}).pipe(

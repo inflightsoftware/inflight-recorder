@@ -5,7 +5,6 @@ use cap_editor::SegmentMedia;
 use cap_project::{ProjectConfiguration, RecordingMeta, StudioRecordingMeta};
 use cap_rendering::{ProjectRecordingsMeta, RenderVideoConstants};
 use std::{path::PathBuf, sync::Arc};
-use tracing::error;
 
 #[derive(thiserror::Error, Debug)]
 pub enum ExportError {
@@ -53,11 +52,22 @@ pub struct ExporterBuilder {
     project_path: PathBuf,
     config: Option<ProjectConfiguration>,
     output_path: Option<PathBuf>,
+    force_ffmpeg_decoder: bool,
 }
 
 impl ExporterBuilder {
     pub fn with_config(mut self, config: ProjectConfiguration) -> Self {
         self.config = Some(config);
+        self
+    }
+
+    pub fn with_output_path(mut self, output_path: PathBuf) -> Self {
+        self.output_path = Some(output_path);
+        self
+    }
+
+    pub fn with_force_ffmpeg_decoder(mut self, force: bool) -> Self {
+        self.force_ffmpeg_decoder = force;
         self
     }
 
@@ -91,9 +101,10 @@ impl ExporterBuilder {
             .map_err(Error::RendererSetup)?,
         );
 
-        let segments = cap_editor::create_segments(&recording_meta, studio_meta)
-            .await
-            .map_err(Error::MediaLoad)?;
+        let segments =
+            cap_editor::create_segments(&recording_meta, studio_meta, self.force_ffmpeg_decoder)
+                .await
+                .map_err(Error::MediaLoad)?;
 
         let output_path = self
             .output_path
@@ -145,6 +156,7 @@ impl ExporterBase {
             project_path,
             config: None,
             output_path: None,
+            force_ffmpeg_decoder: false,
         }
     }
 }

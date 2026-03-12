@@ -56,7 +56,7 @@ mod windows {
                         return None;
                     }
 
-                    let video_info = &*media_type.video_info();
+                    let video_info = media_type.video_info();
 
                     let width = video_info.bmiHeader.biWidth;
                     let height = video_info.bmiHeader.biHeight;
@@ -114,10 +114,11 @@ mod windows {
                 .start_capturing(
                     &selected_format.media_type,
                     Box::new(|frame| {
-                        unsafe { dbg!(frame.sample.GetActualDataLength()) };
-                        // dbg!(frame.media_type.subtype_str());
-                        // dbg!(frame.reference_time);
-                        dbg!(frame.timestamp);
+                        let data_length = frame.sample.GetActualDataLength();
+                        println!(
+                            "Frame: data_length={data_length:?}, timestamp={:?}",
+                            frame.timestamp
+                        );
                     }),
                 )
                 .unwrap();

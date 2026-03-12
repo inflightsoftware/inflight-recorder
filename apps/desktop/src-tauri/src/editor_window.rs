@@ -27,13 +27,15 @@ async fn do_prewarm(app: AppHandle, path: PathBuf) -> PendingResult {
     let inner = create_editor_instance_impl(
         &app,
         path,
-        Box::new(move |frame| {
-            let _ = frame_tx.send(WSFrame {
-                data: frame.data,
-                width: frame.width,
-                height: frame.height,
-                stride: frame.padded_bytes_per_row,
-            });
+        Box::new(move |output| {
+            if let cap_editor::EditorFrameOutput::Rgba(frame) = output {
+                let _ = frame_tx.send(WSFrame {
+                    data: frame.data.to_vec(),
+                    width: frame.width,
+                    height: frame.height,
+                    stride: frame.padded_bytes_per_row,
+                });
+            }
         }),
     )
     .await?;
@@ -182,13 +184,15 @@ impl EditorInstances {
                 let instance = create_editor_instance_impl(
                     window.app_handle(),
                     path,
-                    Box::new(move |frame| {
-                        let _ = frame_tx.send(WSFrame {
-                            data: frame.data,
-                            width: frame.width,
-                            height: frame.height,
-                            stride: frame.padded_bytes_per_row,
-                        });
+                    Box::new(move |output| {
+                        if let cap_editor::EditorFrameOutput::Rgba(frame) = output {
+                            let _ = frame_tx.send(WSFrame {
+                                data: frame.data.to_vec(),
+                                width: frame.width,
+                                height: frame.height,
+                                stride: frame.padded_bytes_per_row,
+                            });
+                        }
                     }),
                 )
                 .await?;

@@ -21,6 +21,7 @@ jobs:
     name: Detect Changes
     runs-on: ubuntu-latest
     outputs:
+      desktop: ${{ steps.filter.outputs.desktop }}
       rust: ${{ steps.filter.outputs.rust }}
       tauri-plugins: ${{ steps.filter.outputs.tauri-plugins }}
       branch: ${{ steps.branch.outputs.branch }}

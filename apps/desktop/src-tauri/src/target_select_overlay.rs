@@ -226,6 +226,95 @@ pub async fn display_information(display_id: &str) -> Result<DisplayInformation,
 #[specta::specta]
 #[tauri::command]
 #[instrument]
+pub async fn raise_window(window_id: WindowId) -> Result<(), String> {
+    let window = Window::from_id(&window_id).ok_or("Window not found")?;
+
+    #[cfg(target_os = "macos")]
+    {
+        use core_foundation::base::TCFType;
+        use core_foundation::string::CFString;
+        use objc2_app_kit::{NSApplicationActivationOptions, NSRunningApplication};
+
+        let pid = window
+            .raw_handle()
+            .owner_pid()
+            .ok_or("Could not get window owner PID")?;
+
+        let cg_window_id: u32 = window_id
+            .to_string()
+            .parse()
+            .map_err(|_| "Invalid window ID")?;
+
+        unsafe {
+            NSRunningApplication::currentApplication().activateWithOptions(
+                NSApplicationActivationOptions::ActivateIgnoringOtherApps,
+            );
+
+            if let Some(app) =
+                NSRunningApplication::runningApplicationWithProcessIdentifier(pid)
+            {
+                app.activateWithOptions(
+                    NSApplicationActivationOptions::ActivateIgnoringOtherApps,
+                );
+            }
+
+            let app_element = AXUIElementCreateApplication(pid);
+            let mut windows_ref: core_foundation::base::CFTypeRef = std::ptr::null();
+            let attr = CFString::new("AXWindows");
+            let err = AXUIElementCopyAttributeValue(
+                app_element,
+                attr.as_concrete_TypeRef(),
+                &mut windows_ref,
+            );
+            if err == 0 && !windows_ref.is_null() {
+                let windows_array =
+                    core_foundation::array::CFArray::<*const std::ffi::c_void>::wrap_under_create_rule(
+                        windows_ref as _,
+                    );
+
+                for i in 0..windows_array.len() {
+                    let ax_window = *windows_array.get(i).unwrap();
+                    let mut cg_id: u32 = 0;
+                    if _AXUIElementGetWindow(ax_window as _, &mut cg_id) == 0
+                        && cg_id == cg_window_id
+                    {
+                        let action = CFString::new("AXRaise");
+                        AXUIElementPerformAction(ax_window as _, action.as_concrete_TypeRef());
+                        break;
+                    }
+                }
+            }
+            core_foundation::base::CFRelease(app_element as _);
+        }
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = window;
+    }
+
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[link(name = "ApplicationServices", kind = "framework")]
+unsafe extern "C" {
+    fn AXUIElementCreateApplication(pid: i32) -> *const std::ffi::c_void;
+    fn AXUIElementCopyAttributeValue(
+        element: *const std::ffi::c_void,
+        attribute: core_foundation::string::CFStringRef,
+        value: *mut core_foundation::base::CFTypeRef,
+    ) -> i32;
+    fn AXUIElementPerformAction(
+        element: *const std::ffi::c_void,
+        action: core_foundation::string::CFStringRef,
+    ) -> i32;
+    fn _AXUIElementGetWindow(element: *const std::ffi::c_void, window_id: *mut u32) -> i32;
+}
+
+#[specta::specta]
+#[tauri::command]
+#[instrument]
 pub async fn focus_window(window_id: WindowId) -> Result<(), String> {
     let window = Window::from_id(&window_id).ok_or("Window not found")?;
 

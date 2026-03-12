@@ -1313,6 +1313,7 @@ async fn handle_recording_end(
     }
 
     if let Some(window) = CapWindowId::Main.get(&handle) {
+        window.show().ok();
         window.unminimize().ok();
     } else {
         if let Some(v) = CapWindowId::Camera.get(&handle) {

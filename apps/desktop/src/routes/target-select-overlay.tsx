@@ -121,10 +121,45 @@ function Inner() {
 		window: null,
 	});
 
+	const [cursorPos, setCursorPos] = createSignal({ x: 0, y: 0 });
+	createEventListener(document, "mousemove", (e) => {
+		setCursorPos({ x: e.clientX, y: e.clientY });
+	});
+
 	const unsubTargetUnderCursor = events.targetUnderCursor.listen((event) => {
-		setTargetUnderCursor(reconcile(event.payload));
+		const current = targetUnderCursor.window;
+		const incoming = event.payload;
+
+		if (
+			options.targetMode === "window" &&
+			current &&
+			incoming.window &&
+			current.id !== incoming.window.id
+		) {
+			const pos = cursorPos();
+			const b = current.bounds;
+			const inCurrentBounds =
+				pos.x >= b.position.x &&
+				pos.x <= b.position.x + b.size.width &&
+				pos.y >= b.position.y &&
+				pos.y <= b.position.y + b.size.height;
+
+			if (inCurrentBounds) {
+				setTargetUnderCursor("display_id", incoming.display_id);
+				return;
+			}
+		}
+
+		setTargetUnderCursor(reconcile(incoming));
 	});
 	onCleanup(() => unsubTargetUnderCursor.then((unsub) => unsub()));
+
+	createEffect(() => {
+		const win = targetUnderCursor.window;
+		if (options.targetMode === "window" && win) {
+			commands.raiseWindow(win.id).catch(() => {});
+		}
+	});
 
 	const windowIcon = useQuery(() => ({
 		queryKey: ["windowIcon", targetUnderCursor.window?.id],
@@ -273,23 +308,29 @@ function Inner() {
 							class="relative w-screen h-screen bg-black/70"
 						>
 							<div
-								class="flex absolute flex-col justify-center items-center bg-blue-600/40"
+								class="flex absolute flex-col justify-center items-center bg-blue-600/40 cursor-pointer"
 								style={{
 									width: `${windowUnderCursor.bounds.size.width}px`,
 									height: `${windowUnderCursor.bounds.size.height}px`,
 									left: `${windowUnderCursor.bounds.position.x}px`,
 									top: `${windowUnderCursor.bounds.position.y}px`,
 								}}
-								onClick={() => {
-									setOptions(
-										"captureTarget",
-										reconcile({
+								onClick={async () => {
+									const auth = await authStore.get();
+									if (!auth) {
+										emit("start-sign-in");
+										return;
+									}
+
+									await commands.startRecording({
+										capture_target: {
 											variant: "window",
 											id: windowUnderCursor.id,
-										}),
-									);
-									setOptions("targetMode", null);
-									commands.closeTargetSelectOverlays();
+										},
+										mode: options.mode,
+										capture_system_audio: options.captureSystemAudio,
+										workspace_id: options.workspaceId,
+									});
 								}}
 							>
 								<div class="flex flex-col justify-center items-center text-white">

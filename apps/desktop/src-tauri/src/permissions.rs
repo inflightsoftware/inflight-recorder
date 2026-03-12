@@ -66,9 +66,6 @@ pub fn open_permission_settings(_permission: OSPermission) {
 pub async fn request_permission(_permission: OSPermission) {
     #[cfg(target_os = "macos")]
     {
-        use futures::executor::block_on;
-        use std::thread;
-
         match _permission {
             OSPermission::ScreenRecording => {
                 #[cfg(target_os = "macos")]
@@ -78,18 +75,18 @@ pub async fn request_permission(_permission: OSPermission) {
                 }
             }
             OSPermission::Camera => {
-                thread::spawn(|| {
-                    block_on(av::CaptureDevice::request_access_for_media_type(
-                        av::MediaType::video(),
-                    ))
+                std::thread::spawn(|| {
+                    futures::executor::block_on(
+                        av::CaptureDevice::request_access_for_media_type(av::MediaType::video()),
+                    )
                     .ok();
                 });
             }
             OSPermission::Microphone => {
-                thread::spawn(|| {
-                    block_on(av::CaptureDevice::request_access_for_media_type(
-                        av::MediaType::audio(),
-                    ))
+                std::thread::spawn(|| {
+                    futures::executor::block_on(
+                        av::CaptureDevice::request_access_for_media_type(av::MediaType::audio()),
+                    )
                     .ok();
                 });
             }

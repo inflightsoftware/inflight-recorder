@@ -9,6 +9,109 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fe438c63458706e03479442743baae6c88256498e6431708f6dfc520a26515d3"
 
 [[package]]
+name = "Inflight"
+version = "0.4.27"
+dependencies = [
+ "anyhow",
+ "async-stream",
+ "axum",
+ "base64 0.22.1",
+ "bytemuck",
+ "bytes",
+ "cap-audio",
+ "cap-camera",
+ "cap-editor",
+ "cap-export",
+ "cap-fail",
+ "cap-flags",
+ "cap-media",
+ "cap-project",
+ "cap-recording",
+ "cap-rendering",
+ "cap-utils",
+ "chrono",
+ "cidre",
+ "clipboard-rs",
+ "cocoa",
+ "core-foundation 0.10.1",
+ "core-graphics 0.24.0",
+ "cpal 0.15.3 (git+https://github.com/CapSoftware/cpal?rev=3cc779a7b4ca)",
+ "device_query",
+ "dirs 6.0.0",
+ "dotenvy_macro",
+ "ffmpeg-next",
+ "flume",
+ "futures",
+ "futures-intrusive",
+ "global-hotkey",
+ "image 0.25.8",
+ "kameo",
+ "keyed_priority_queue",
+ "lazy_static",
+ "log",
+ "md5",
+ "nix 0.29.0",
+ "objc",
+ "objc2-app-kit",
+ "opentelemetry",
+ "opentelemetry-otlp",
+ "opentelemetry_sdk",
+ "png 0.17.16",
+ "posthog-rs",
+ "rand 0.8.5",
+ "relative-path",
+ "reqwest 0.12.24",
+ "rodio",
+ "scap-direct3d",
+ "scap-screencapturekit",
+ "scap-targets",
+ "sentry",
+ "serde",
+ "serde_json",
+ "specta",
+ "specta-typescript",
+ "swift-rs",
+ "tauri",
+ "tauri-build",
+ "tauri-nspanel",
+ "tauri-plugin-clipboard-manager",
+ "tauri-plugin-deep-link",
+ "tauri-plugin-dialog",
+ "tauri-plugin-fs",
+ "tauri-plugin-global-shortcut",
+ "tauri-plugin-http",
+ "tauri-plugin-notification",
+ "tauri-plugin-oauth",
+ "tauri-plugin-opener",
+ "tauri-plugin-os",
+ "tauri-plugin-positioner",
+ "tauri-plugin-process",
+ "tauri-plugin-sentry",
+ "tauri-plugin-shell",
+ "tauri-plugin-single-instance",
+ "tauri-plugin-store",
+ "tauri-plugin-updater",
+ "tauri-plugin-window-state",
+ "tauri-specta",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-stream",
+ "tokio-util",
+ "tracing",
+ "tracing-appender",
+ "tracing-futures",
+ "tracing-opentelemetry",
+ "tracing-subscriber",
+ "uuid",
+ "wgpu",
+ "whisper-rs",
+ "windows 0.60.0",
+ "windows-sys 0.59.0",
+ "workspace-hack",
+]
+
+[[package]]
 name = "actix-codec"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1179,117 +1282,6 @@ dependencies = [
  "specta",
  "strum 0.27.2",
  "windows 0.60.0",
- "workspace-hack",
-]
-
-[[package]]
-name = "cap-desktop"
-version = "0.4.8"
-dependencies = [
- "aho-corasick",
- "anyhow",
- "async-stream",
- "axum",
- "base64 0.22.1",
- "bytemuck",
- "bytes",
- "cap-audio",
- "cap-camera",
- "cap-editor",
- "cap-enc-ffmpeg",
- "cap-export",
- "cap-fail",
- "cap-flags",
- "cap-media",
- "cap-media-info",
- "cap-project",
- "cap-recording",
- "cap-rendering",
- "cap-utils",
- "chrono",
- "cidre",
- "clipboard-rs",
- "cocoa",
- "core-foundation 0.10.1",
- "core-graphics 0.24.0",
- "cpal 0.15.3 (git+https://github.com/CapSoftware/cpal?rev=3cc779a7b4ca)",
- "device_query",
- "dirs 6.0.0",
- "dotenvy_macro",
- "ffmpeg-next",
- "flume",
- "futures",
- "futures-intrusive",
- "global-hotkey",
- "image 0.25.8",
- "kameo",
- "keyed_priority_queue",
- "lazy_static",
- "log",
- "lz4_flex",
- "md5",
- "nix 0.29.0",
- "objc",
- "objc2-app-kit",
- "opentelemetry",
- "opentelemetry-otlp",
- "opentelemetry_sdk",
- "png 0.17.16",
- "posthog-rs",
- "rand 0.8.5",
- "regex",
- "relative-path",
- "reqwest 0.12.24",
- "rodio",
- "sanitize-filename",
- "scap-direct3d",
- "scap-screencapturekit",
- "scap-targets",
- "sentry",
- "serde",
- "serde_json",
- "specta",
- "specta-typescript",
- "swift-rs",
- "sysinfo 0.35.2",
- "tauri",
- "tauri-build",
- "tauri-nspanel",
- "tauri-plugin-clipboard-manager",
- "tauri-plugin-deep-link",
- "tauri-plugin-dialog",
- "tauri-plugin-fs",
- "tauri-plugin-global-shortcut",
- "tauri-plugin-http",
- "tauri-plugin-notification",
- "tauri-plugin-oauth",
- "tauri-plugin-opener",
- "tauri-plugin-os",
- "tauri-plugin-positioner",
- "tauri-plugin-process",
- "tauri-plugin-sentry",
- "tauri-plugin-shell",
- "tauri-plugin-single-instance",
- "tauri-plugin-store",
- "tauri-plugin-updater",
- "tauri-plugin-window-state",
- "tauri-specta",
- "tempfile",
- "thiserror 1.0.69",
- "tokio",
- "tokio-stream",
- "tokio-util",
- "tracing",
- "tracing-appender",
- "tracing-futures",
- "tracing-opentelemetry",
- "tracing-subscriber",
- "uuid",
- "wgpu",
- "whisper-rs",
- "windows 0.60.0",
- "windows-sys 0.59.0",
- "winreg 0.55.0",
  "workspace-hack",
 ]
 
@@ -5106,15 +5098,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "112b39cec0b298b6c1999fee3e31427f74f676e4cb9879ed1a121b43661a4154"
 
 [[package]]
-name = "lz4_flex"
-version = "0.11.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08ab2867e3eeeca90e844d1940eab391c9dc5228783db2ed999acbc0a9ed375a"
-dependencies = [
- "twox-hash",
-]
-
-[[package]]
 name = "mac"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7850,15 +7833,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "sanitize-filename"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc984f4f9ceb736a7bb755c3e3bd17dc56370af2600c9780dcc48c66453da34d"
-dependencies = [
- "regex",
-]
-
-[[package]]
 name = "scap-cpal"
 version = "0.1.0"
 dependencies = [
@@ -9106,21 +9080,22 @@ dependencies = [
 
 [[package]]
 name = "tao"
-version = "0.34.3"
+version = "0.34.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6e06d52c379e63da659a483a958110bbde891695a0ecb53e48cc7786d5eda7bb"
 dependencies = [
  "bitflags 2.9.4",
  "block2 0.6.1",
  "core-foundation 0.10.1",
- "core-graphics 0.24.0",
+ "core-graphics 0.25.0",
  "crossbeam-channel",
- "dispatch",
+ "dispatch2",
  "dlopen2",
  "dpi",
  "gdkwayland-sys",
  "gdkx11-sys",
  "gtk",
  "jni",
- "lazy_static",
  "libc",
  "log",
  "ndk 0.9.0",
@@ -9132,7 +9107,6 @@ dependencies = [
  "once_cell",
  "parking_lot",
  "raw-window-handle",
- "scopeguard",
  "tao-macros",
  "unicode-segmentation",
  "url",
@@ -10445,12 +10419,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "twox-hash"
-version = "2.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ea3136b675547379c4bd395ca6b938e5ad3c3d20fad76e7fe85f9e0d011419c"
-
-[[package]]
 name = "typeid"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11220,6 +11188,8 @@ dependencies = [
 [[package]]
 name = "wgpu-hal"
 version = "25.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f968767fe4d3d33747bbd1473ccd55bf0f6451f55d733b5597e67b5deab4ad17"
 dependencies = [
  "android_system_properties",
  "arrayvec",

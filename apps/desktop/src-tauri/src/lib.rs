@@ -2409,6 +2409,7 @@ pub async fn run(recording_logging_handle: LoggingHandle, logs_dir: PathBuf) {
             target_select_overlay::display_information,
             target_select_overlay::get_window_icon,
             target_select_overlay::focus_window,
+            target_select_overlay::raise_window,
             editor_delete_project
         ])
         .events(tauri_specta::collect_events![

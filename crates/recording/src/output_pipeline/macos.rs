@@ -91,14 +91,14 @@ fn wait_for_worker(
 }
 
 struct ChannelPressureTracker {
-    depth: Arc<std::sync::atomic::AtomicUsize>,
+    depth: Arc<std::sync::atomic::AtomicIsize>,
     capacity: usize,
     last_warning: std::time::Instant,
 }
 
 impl ChannelPressureTracker {
-    fn new(capacity: usize) -> (Self, Arc<std::sync::atomic::AtomicUsize>) {
-        let depth = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    fn new(capacity: usize) -> (Self, Arc<std::sync::atomic::AtomicIsize>) {
+        let depth = Arc::new(std::sync::atomic::AtomicIsize::new(0));
         (
             Self {
                 depth: depth.clone(),
@@ -114,7 +114,7 @@ impl ChannelPressureTracker {
             .depth
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
             + 1;
-        let threshold = (self.capacity * 4) / 5;
+        let threshold = (self.capacity as isize * 4) / 5;
         if current > threshold && self.last_warning.elapsed() >= Duration::from_secs(5) {
             self.last_warning = std::time::Instant::now();
             warn!(

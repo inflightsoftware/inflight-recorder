@@ -854,6 +854,7 @@ async fn get_current_recording(
             screen: screen.clone(),
             bounds: *bounds,
         },
+        ScreenCaptureTarget::CameraOnly => return Err(()),
     };
 
     Ok(JsonValue::new(&Some(CurrentRecording {
@@ -1379,7 +1380,7 @@ async fn get_video_metadata(path: PathBuf) -> Result<VideoRecordingMetadata, Str
                 return Err("Unable to get metadata on in-progress recording".to_string());
             }
 
-            match meta {
+            match &**meta {
                 StudioRecordingMeta::SingleSegment { segment } => {
                     vec![recording_meta.path(&segment.display.path)]
                 }
@@ -1818,15 +1819,17 @@ impl RecordingMetaWithMetadata {
                 RecordingMetaInner::Instant(_) => RecordingMode::Instant,
             },
             status: match &inner.inner {
-                RecordingMetaInner::Studio(StudioRecordingMeta::MultipleSegments { inner }) => {
-                    inner
-                        .status
-                        .clone()
-                        .unwrap_or(StudioRecordingStatus::Complete)
-                }
-                RecordingMetaInner::Studio(StudioRecordingMeta::SingleSegment { .. }) => {
-                    StudioRecordingStatus::Complete
-                }
+                RecordingMetaInner::Studio(meta) => match meta.as_ref() {
+                    StudioRecordingMeta::MultipleSegments { inner } => {
+                        inner
+                            .status
+                            .clone()
+                            .unwrap_or(StudioRecordingStatus::Complete)
+                    }
+                    StudioRecordingMeta::SingleSegment { .. } => {
+                        StudioRecordingStatus::Complete
+                    }
+                },
                 RecordingMetaInner::Instant(InstantRecordingMeta::InProgress { .. }) => {
                     StudioRecordingStatus::InProgress
                 }
@@ -2979,12 +2982,14 @@ async fn resume_uploads(app: AppHandle) -> Result<(), String> {
                 // Check if recording is still marked as in-progress and if so mark as failed
                 // This should only happen if the application crashes while recording
                 match &mut meta.inner {
-                    RecordingMetaInner::Studio(StudioRecordingMeta::MultipleSegments { inner }) => {
-                        if let Some(StudioRecordingStatus::InProgress) = &inner.status {
-                            inner.status = Some(StudioRecordingStatus::Failed {
-                                error: "Recording crashed".to_string(),
-                            });
-                            needs_save = true;
+                    RecordingMetaInner::Studio(studio_meta) => {
+                        if let StudioRecordingMeta::MultipleSegments { inner } = studio_meta.as_mut() {
+                            if let Some(StudioRecordingStatus::InProgress) = &inner.status {
+                                inner.status = Some(StudioRecordingStatus::Failed {
+                                    error: "Recording crashed".to_string(),
+                                });
+                                needs_save = true;
+                            }
                         }
                     }
                     RecordingMetaInner::Instant(InstantRecordingMeta::InProgress { .. }) => {
@@ -3089,7 +3094,7 @@ async fn resume_uploads(app: AppHandle) -> Result<(), String> {
 async fn create_editor_instance_impl(
     app: &AppHandle,
     path: PathBuf,
-    frame_cb: Box<dyn FnMut(RenderedFrame) + Send>,
+    frame_cb: Box<dyn FnMut(cap_editor::EditorFrameOutput) + Send>,
 ) -> Result<Arc<EditorInstance>, String> {
     let app = app.clone();
 
@@ -3101,6 +3106,7 @@ async fn create_editor_instance_impl(
                 let _ = EditorStateChanged::new(state).emit(&app);
             },
             frame_cb,
+            None,
         )
         .await?
     };

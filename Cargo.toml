@@ -38,7 +38,7 @@ nokhwa = { git = "https://github.com/CapSoftware/nokhwa", rev = "b9c8079e82e2", 
 ] }
 nokhwa-bindings-macos = { git = "https://github.com/CapSoftware/nokhwa", rev = "b9c8079e82e2" }
 wgpu = { version = "25.0.0", features = ["wgpu-core"] }
-wgpu-hal = "25.0.0"
+wgpu-hal = "25.0.2"
 wgpu-core = "25.0.0"
 flume = "0.11.0"
 thiserror = "1.0"
@@ -107,8 +107,6 @@ debug = true
 cidre = { git = "https://github.com/CapSoftware/cidre", rev = "bf84b67079a8" }
 # https://github.com/gfx-rs/wgpu/pull/7550
 # wgpu = { git = "https://github.com/gfx-rs/wgpu", rev = "cd41a6e32a6239b65d1cecbeccde6a43a100914a" }
-wgpu-hal = { path = "vendor/wgpu-hal" }
-tao = { path = "vendor/tao" }
 
 # https://github.com/CapSoftware/posthog-rs/commit/c7e9712be2f9a9122b1df685d5a067afa5415288
 posthog-rs = { git = "https://github.com/CapSoftware/posthog-rs", rev = "c7e9712be2f9a9122b1df685d5a067afa5415288" }

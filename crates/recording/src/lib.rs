@@ -1,12 +1,22 @@
 pub mod benchmark;
 mod capture_pipeline;
 pub mod cursor;
+pub mod diagnostics;
 pub mod feeds;
+pub mod fragmentation;
 pub mod instant_recording;
 mod output_pipeline;
+pub mod recovery;
+mod resolution_limits;
 pub mod screenshot;
 pub mod sources;
 pub mod studio_recording;
+pub mod sync_calibration;
+
+pub use resolution_limits::{H264_MAX_DIMENSION, calculate_gpu_compatible_size};
+
+#[cfg(any(test, feature = "test-utils"))]
+pub mod test_sources;
 
 pub use feeds::{camera::CameraFeed, microphone::MicrophoneFeed};
 pub use output_pipeline::*;
@@ -49,9 +59,29 @@ pub struct RecordingBaseInputs {
     pub mic_feed: Option<Arc<MicrophoneFeedLock>>,
     pub camera_feed: Option<Arc<CameraFeedLock>>,
     #[cfg(target_os = "macos")]
-    pub shareable_content: cidre::arc::R<cidre::sc::ShareableContent>,
+    pub shareable_content: Option<SendableShareableContent>,
     #[cfg(target_os = "macos")]
     pub excluded_windows: Vec<scap_targets::WindowId>,
+}
+
+#[cfg(target_os = "macos")]
+#[derive(Clone)]
+pub struct SendableShareableContent(
+    Arc<std::sync::Mutex<cidre::arc::R<cidre::sc::ShareableContent>>>,
+);
+
+#[cfg(target_os = "macos")]
+impl SendableShareableContent {
+    pub fn retained(&self) -> cidre::arc::R<cidre::sc::ShareableContent> {
+        self.0.lock().unwrap_or_else(|e| e.into_inner()).clone()
+    }
+}
+
+#[cfg(target_os = "macos")]
+impl From<cidre::arc::R<cidre::sc::ShareableContent>> for SendableShareableContent {
+    fn from(value: cidre::arc::R<cidre::sc::ShareableContent>) -> Self {
+        Self(Arc::new(std::sync::Mutex::new(value)))
+    }
 }
 
 #[derive(specta::Type, Serialize, Deserialize, Clone, Debug)]

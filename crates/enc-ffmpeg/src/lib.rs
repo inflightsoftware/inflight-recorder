@@ -8,3 +8,11 @@ pub use video::*;
 
 mod mux;
 pub use mux::*;
+
+pub mod remux;
+pub mod segmented_audio {
+    pub use crate::mux::segmented_audio::*;
+}
+pub mod segmented_stream {
+    pub use crate::mux::segmented_stream::*;
+}

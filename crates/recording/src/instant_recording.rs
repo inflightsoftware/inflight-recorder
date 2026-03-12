@@ -1,18 +1,20 @@
+#[cfg(target_os = "macos")]
+use crate::SendableShareableContent;
 use crate::{
     RecordingBaseInputs,
     capture_pipeline::{
         MakeCapturePipeline, ScreenCaptureMethod, Stop, target_to_display_and_crop,
     },
-    feeds::{camera::CameraFeedLock, microphone::MicrophoneFeedLock},
+    feeds::microphone::MicrophoneFeedLock,
     output_pipeline::{self, OutputPipeline},
+    resolution_limits::ensure_even,
     sources::screen_capture::{ScreenCaptureConfig, ScreenCaptureTarget},
 };
-use anyhow::{Context as _, anyhow};
+use anyhow::Context as _;
 use cap_media_info::{AudioInfo, VideoInfo};
 use cap_project::InstantRecordingMeta;
 use cap_timestamp::Timestamps;
 use cap_utils::ensure_dir;
-use futures::future::OptionFuture;
 use kameo::{Actor as _, prelude::*};
 use std::{
     path::PathBuf,
@@ -22,15 +24,8 @@ use std::{
 use tracing::*;
 
 struct Pipeline {
-    screen: OutputPipeline,
-    camera: Option<OutputPipeline>,
-    cursor: Option<CursorPipeline>,
+    output: OutputPipeline,
     video_info: VideoInfo,
-}
-
-struct CursorPipeline {
-    output_path: PathBuf,
-    actor: crate::cursor::CursorActor,
 }
 
 enum ActorState {
@@ -51,6 +46,7 @@ pub struct ActorHandle {
     actor_ref: kameo::actor::ActorRef<Actor>,
     pub capture_target: ScreenCaptureTarget,
     done_fut: output_pipeline::DoneFut,
+    health_rx: Option<output_pipeline::HealthReceiver>,
 }
 
 impl ActorHandle {
@@ -60,6 +56,10 @@ impl ActorHandle {
 
     pub fn done_fut(&self) -> output_pipeline::DoneFut {
         self.done_fut.clone()
+    }
+
+    pub fn take_health_rx(&mut self) -> Option<output_pipeline::HealthReceiver> {
+        self.health_rx.take()
     }
 
     pub async fn pause(&self) -> anyhow::Result<()> {
@@ -72,6 +72,10 @@ impl ActorHandle {
 
     pub async fn cancel(&self) -> anyhow::Result<()> {
         Ok(self.actor_ref.ask(Cancel).await?)
+    }
+
+    pub async fn is_paused(&self) -> anyhow::Result<bool> {
+        Ok(self.actor_ref.ask(IsPaused).await?)
     }
 }
 
@@ -105,29 +109,8 @@ impl Actor {
             )
         });
 
-        if let Some(mut pipeline) = pipeline {
-            use futures::future::OptionFuture;
-
-            let (screen, camera) = futures::join!(
-                pipeline.screen.stop(),
-                OptionFuture::from(pipeline.camera.map(|s| s.stop())),
-            );
-
-            screen?;
-            camera.transpose()?;
-
-            if let Some(cursor) = pipeline.cursor.as_mut() {
-                cursor.actor.stop();
-                if let Ok(res) = cursor.actor.rx.clone().await {
-                    std::fs::write(
-                        &cursor.output_path,
-                        serde_json::to_string_pretty(&cap_project::CursorEvents {
-                            clicks: res.clicks,
-                            moves: res.moves,
-                        })?,
-                    )?;
-                }
-            }
+        if let Some(pipeline) = pipeline {
+            pipeline.output.stop().await?;
         }
 
         Ok(())
@@ -163,10 +146,7 @@ impl Message<Pause> for Actor {
                 segment_start_time,
             } = state
             {
-                pipeline.screen.pause();
-                if let Some(ref camera) = pipeline.camera {
-                    camera.pause();
-                }
+                pipeline.output.pause();
                 return ActorState::Paused {
                     pipeline,
                     segment_start_time,
@@ -190,10 +170,7 @@ impl Message<Resume> for Actor {
                 segment_start_time,
             } = state
             {
-                pipeline.screen.resume();
-                if let Some(ref camera) = pipeline.camera {
-                    camera.resume();
-                }
+                pipeline.output.resume();
                 return ActorState::Recording {
                     pipeline,
                     segment_start_time,
@@ -217,6 +194,16 @@ impl Message<Cancel> for Actor {
     }
 }
 
+pub struct IsPaused;
+
+impl Message<IsPaused> for Actor {
+    type Reply = bool;
+
+    async fn handle(&mut self, _: IsPaused, _: &mut Context<Self, Self::Reply>) -> Self::Reply {
+        matches!(self.state, ActorState::Paused { .. })
+    }
+}
+
 #[derive(Debug)]
 pub struct CompletedRecording {
     pub project_path: PathBuf,
@@ -225,36 +212,13 @@ pub struct CompletedRecording {
 }
 
 async fn create_pipeline(
-    content_dir: PathBuf,
-    base_inputs: RecordingBaseInputs,
-    custom_cursor_capture: bool,
-    start_time: Timestamps,
+    output_path: PathBuf,
+    screen_source: ScreenCaptureConfig<ScreenCaptureMethod>,
+    mic_feed: Option<Arc<MicrophoneFeedLock>>,
     max_output_size: Option<u32>,
+    start_time: Timestamps,
 ) -> anyhow::Result<Pipeline> {
-    #[cfg(windows)]
-    let d3d_device = crate::capture_pipeline::create_d3d_device()?;
-
-    let (display, crop) =
-        target_to_display_and_crop(&base_inputs.capture_target).context("target_display_crop")?;
-
-    let screen_source = ScreenCaptureConfig::<ScreenCaptureMethod>::init(
-        display,
-        crop,
-        !custom_cursor_capture,
-        30,
-        start_time.system_time(),
-        base_inputs.capture_system_audio,
-        #[cfg(windows)]
-        d3d_device,
-        #[cfg(target_os = "macos")]
-        base_inputs.shareable_content,
-        #[cfg(target_os = "macos")]
-        base_inputs.excluded_windows,
-    )
-    .await
-    .context("screen capture init")?;
-
-    if let Some(mic_feed) = &base_inputs.mic_feed {
+    if let Some(mic_feed) = &mic_feed {
         debug!(
             "mic audio info: {:#?}",
             AudioInfo::from_stream_config(mic_feed.config())
@@ -273,67 +237,29 @@ async fn create_pipeline(
                 ),
             )
         })
-        .unwrap_or((screen_info.width, screen_info.height));
+        .unwrap_or_else(|| {
+            (
+                ensure_even(screen_info.width),
+                ensure_even(screen_info.height),
+            )
+        });
 
     let (screen_capture, system_audio) = screen_source.to_sources().await?;
 
-    let screen = ScreenCaptureMethod::make_instant_mode_pipeline(
+    let output = ScreenCaptureMethod::make_instant_mode_pipeline(
         screen_capture,
         system_audio,
-        base_inputs.mic_feed.clone(),
-        content_dir.join("display.mp4"),
+        mic_feed,
+        output_path.clone(),
         output_resolution,
+        start_time,
         #[cfg(windows)]
         crate::capture_pipeline::EncoderPreferences::new(),
     )
     .await?;
 
-    let camera = OptionFuture::from(base_inputs.camera_feed.map(|camera_feed| {
-        let camera_info = camera_feed.video_info();
-        let camera_resolution = clamp_size((camera_info.width, camera_info.height), (1280, 720));
-
-        OutputPipeline::builder(content_dir.join("camera.mp4"))
-            .with_video::<crate::sources::Camera>(camera_feed)
-            .with_timestamps(start_time)
-            .build::<crate::ffmpeg::Mp4Muxer>(crate::ffmpeg::Mp4MuxerConfig {
-                output_size: Some(camera_resolution),
-                bpp: Some(0.15),
-            })
-            .instrument(error_span!("camera-out"))
-    }))
-    .await
-    .transpose()
-    .context("camera pipeline setup")?;
-
-    let cursor = custom_cursor_capture
-        .then(move || {
-            let cursor_crop_bounds = base_inputs
-                .capture_target
-                .cursor_crop()
-                .ok_or_else(|| anyhow!("NoBounds"))?;
-
-            let cursors_dir = ensure_dir(&content_dir.join("cursors"))?;
-
-            let cursor_actor = crate::cursor::spawn_cursor_recorder(
-                cursor_crop_bounds,
-                display,
-                cursors_dir,
-                Default::default(),
-                0,
-                start_time,
-            );
-
-            Ok::<_, anyhow::Error>(CursorPipeline {
-                output_path: content_dir.join("cursor.json"),
-                actor: cursor_actor,
-            })
-        })
-        .transpose()?;
-
     Ok(Pipeline {
-        screen,
-        camera,
-        cursor,
+        output,
         video_info: VideoInfo::from_raw_ffmpeg(
             screen_info.pixel_format,
             output_resolution.0,
@@ -354,8 +280,7 @@ pub struct ActorBuilder {
     capture_target: ScreenCaptureTarget,
     system_audio: bool,
     mic_feed: Option<Arc<MicrophoneFeedLock>>,
-    camera_feed: Option<Arc<CameraFeedLock>>,
-    custom_cursor: bool,
+    camera_feed: Option<Arc<crate::feeds::camera::CameraFeedLock>>,
     max_output_size: Option<u32>,
     #[cfg(target_os = "macos")]
     excluded_windows: Vec<scap_targets::WindowId>,
@@ -369,7 +294,6 @@ impl ActorBuilder {
             system_audio: false,
             mic_feed: None,
             camera_feed: None,
-            custom_cursor: false,
             max_output_size: None,
             #[cfg(target_os = "macos")]
             excluded_windows: Vec::new(),
@@ -386,13 +310,11 @@ impl ActorBuilder {
         self
     }
 
-    pub fn with_camera_feed(mut self, camera_feed: Arc<CameraFeedLock>) -> Self {
+    pub fn with_camera_feed(
+        mut self,
+        camera_feed: Arc<crate::feeds::camera::CameraFeedLock>,
+    ) -> Self {
         self.camera_feed = Some(camera_feed);
-        self
-    }
-
-    pub fn with_custom_cursor(mut self, custom_cursor: bool) -> Self {
-        self.custom_cursor = custom_cursor;
         self
     }
 
@@ -409,7 +331,7 @@ impl ActorBuilder {
 
     pub async fn build(
         self,
-        #[cfg(target_os = "macos")] shareable_content: cidre::arc::R<cidre::sc::ShareableContent>,
+        #[cfg(target_os = "macos")] shareable_content: Option<SendableShareableContent>,
     ) -> anyhow::Result<ActorHandle> {
         spawn_instant_recording_actor(
             self.output_path,
@@ -423,7 +345,6 @@ impl ActorBuilder {
                 #[cfg(target_os = "macos")]
                 excluded_windows: self.excluded_windows,
             },
-            self.custom_cursor,
             self.max_output_size,
         )
         .await
@@ -434,12 +355,11 @@ impl ActorBuilder {
 pub async fn spawn_instant_recording_actor(
     recording_dir: PathBuf,
     inputs: RecordingBaseInputs,
-    custom_cursor_capture: bool,
     max_output_size: Option<u32>,
 ) -> anyhow::Result<ActorHandle> {
     ensure_dir(&recording_dir)?;
 
-    let start_time = Timestamps::now();
+    let timestamps = Timestamps::now();
 
     trace!("creating recording actor");
 
@@ -448,28 +368,111 @@ pub async fn spawn_instant_recording_actor(
     #[cfg(windows)]
     cap_mediafoundation_utils::thread_init();
 
-    let pipeline = create_pipeline(
-        content_dir,
-        inputs.clone(),
-        custom_cursor_capture,
-        start_time,
-        max_output_size,
-    )
-    .await?;
+    let (mut pipeline, video_info) = match inputs.capture_target {
+        ScreenCaptureTarget::CameraOnly => {
+            let camera_feed = inputs.camera_feed.clone().ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Camera-only recording requires a camera, but no camera is currently available. \
+                    Please select a camera in the recording settings before starting. \
+                    If you have already selected a camera, it may have been disconnected or \
+                    failed to initialize. Try reconnecting your camera or selecting a different one."
+                )
+            })?;
 
-    let video_info = pipeline.video_info;
+            let output_path = content_dir.join("output.mp4");
+
+            let mut builder = OutputPipeline::builder(output_path.clone())
+                .with_video::<crate::sources::NativeCamera>(camera_feed.clone())
+                .with_timestamps(timestamps);
+
+            if let Some(mic_feed) = inputs.mic_feed.clone() {
+                builder = builder.with_audio_source::<crate::sources::Microphone>(mic_feed);
+            }
+
+            #[cfg(target_os = "macos")]
+            let pipeline = builder
+                .build::<output_pipeline::AVFoundationCameraMuxer>(
+                    output_pipeline::AVFoundationCameraMuxerConfig::default(),
+                )
+                .await
+                .context("camera-only pipeline setup")?;
+
+            #[cfg(windows)]
+            let pipeline = builder
+                .build::<output_pipeline::WindowsCameraMuxer>(
+                    output_pipeline::WindowsCameraMuxerConfig {
+                        encoder_preferences: crate::capture_pipeline::EncoderPreferences::default(),
+                        ..Default::default()
+                    },
+                )
+                .await
+                .context("camera-only pipeline setup")?;
+
+            let video_info = *camera_feed.video_info();
+            (
+                Pipeline {
+                    output: pipeline,
+                    video_info,
+                },
+                video_info,
+            )
+        }
+        _ => {
+            #[cfg(windows)]
+            let d3d_device = crate::capture_pipeline::create_d3d_device()?;
+
+            let (display, crop_bounds) = target_to_display_and_crop(&inputs.capture_target)
+                .context("target_display_crop")?;
+
+            let screen_source = ScreenCaptureConfig::<ScreenCaptureMethod>::init(
+                display,
+                crop_bounds,
+                true,
+                30,
+                timestamps.system_time(),
+                inputs.capture_system_audio,
+                #[cfg(windows)]
+                d3d_device,
+                #[cfg(target_os = "macos")]
+                inputs
+                    .shareable_content
+                    .clone()
+                    .ok_or_else(|| anyhow::anyhow!("Missing shareable content"))?,
+                #[cfg(target_os = "macos")]
+                inputs.excluded_windows,
+            )
+            .await
+            .context("screen capture init")?;
+
+            debug!("screen capture: {screen_source:#?}");
+
+            let pipeline = create_pipeline(
+                content_dir.join("output.mp4"),
+                screen_source.clone(),
+                inputs.mic_feed.clone(),
+                max_output_size,
+                timestamps,
+            )
+            .await?;
+
+            let video_info = pipeline.video_info;
+
+            (pipeline, video_info)
+        }
+    };
+
     let segment_start_time = current_time_f64();
 
     trace!("spawning recording actor");
 
-    let done_fut = pipeline.screen.done_fut();
+    let done_fut = pipeline.output.done_fut();
+    let health_rx = pipeline.output.take_health_rx();
     let actor_ref = Actor::spawn(Actor {
         recording_dir,
         capture_target: inputs.capture_target.clone(),
         video_info,
         state: ActorState::Recording {
             pipeline,
-            // pipeline_done_rx,
             segment_start_time,
         },
     });
@@ -478,6 +481,7 @@ pub async fn spawn_instant_recording_actor(
         actor_ref: actor_ref.clone(),
         capture_target: inputs.capture_target,
         done_fut: done_fut.clone(),
+        health_rx,
     };
 
     tokio::spawn(async move {
@@ -493,11 +497,6 @@ fn current_time_f64() -> f64 {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_secs_f64()
-}
-
-fn ensure_even(value: u32) -> u32 {
-    let adjusted = value - (value % 2);
-    if adjusted == 0 { 2 } else { adjusted }
 }
 
 fn clamp_size(input: (u32, u32), max: (u32, u32)) -> (u32, u32) {

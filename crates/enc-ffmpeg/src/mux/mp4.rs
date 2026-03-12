@@ -81,7 +81,7 @@ impl MP4File {
     }
 
     pub fn video_format() -> RawVideoFormat {
-        RawVideoFormat::YUYV420
+        RawVideoFormat::Yuv420p
     }
 
     pub fn queue_video_frame(
@@ -94,6 +94,20 @@ impl MP4File {
         }
 
         self.video.queue_frame(frame, timestamp, &mut self.output)
+    }
+
+    pub fn queue_video_frame_reusable(
+        &mut self,
+        frame: &mut frame::Video,
+        converted_frame: &mut Option<frame::Video>,
+        timestamp: Duration,
+    ) -> Result<(), h264::QueueFrameError> {
+        if self.is_finished {
+            return Ok(());
+        }
+
+        self.video
+            .queue_frame_reusable(frame, converted_frame, timestamp, &mut self.output)
     }
 
     pub fn queue_audio_frame(&mut self, frame: frame::Audio) {

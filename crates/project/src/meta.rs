@@ -20,9 +20,10 @@ pub struct VideoMeta {
     pub path: RelativePathBuf,
     #[serde(default = "legacy_static_video_fps")]
     pub fps: u32,
-    /// unix time of the first frame
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub start_time: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub device_id: Option<String>,
 }
 
 fn legacy_static_video_fps() -> u32 {
@@ -33,9 +34,10 @@ fn legacy_static_video_fps() -> u32 {
 pub struct AudioMeta {
     #[specta(type = String)]
     pub path: RelativePathBuf,
-    /// unix time of the first frame
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub start_time: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub device_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
@@ -55,7 +57,7 @@ impl Default for Platform {
         #[cfg(windows)]
         return Self::Windows;
 
-        #[cfg(target_os = "macos")]
+        #[cfg(not(windows))]
         return Self::MacOS;
     }
 }
@@ -64,7 +66,6 @@ impl Default for Platform {
 pub struct RecordingMeta {
     #[serde(default)]
     pub platform: Option<Platform>,
-    // this field is just for convenience, it shouldn't be persisted
     #[serde(skip_serializing, default)]
     pub project_path: PathBuf,
     pub pretty_name: String,
@@ -94,20 +95,15 @@ pub struct VideoUploadInfo {
 #[serde(tag = "state")]
 pub enum UploadMeta {
     MultipartUpload {
-        // Cap web identifier
         video_id: String,
-        // Data for resuming
         file_path: PathBuf,
         subpath: String,
         pre_created_video: VideoUploadInfo,
         recording_dir: PathBuf,
     },
     SinglePartUpload {
-        // Cap web identifier
         video_id: String,
-        // Path of the Cap file
         recording_dir: PathBuf,
-        // Path to video and screenshot files for resuming
         file_path: PathBuf,
         screenshot_path: PathBuf,
     },
@@ -120,7 +116,7 @@ pub enum UploadMeta {
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(untagged, rename_all = "camelCase")]
 pub enum RecordingMetaInner {
-    Studio(StudioRecordingMeta),
+    Studio(Box<StudioRecordingMeta>),
     Instant(InstantRecordingMeta),
 }
 
@@ -129,17 +125,9 @@ impl specta::Flatten for RecordingMetaInner {}
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(untagged, rename_all = "camelCase")]
 pub enum InstantRecordingMeta {
-    InProgress {
-        // This field means nothing and is just because this enum is untagged.
-        recording: bool,
-    },
-    Failed {
-        error: String,
-    },
-    Complete {
-        fps: u32,
-        sample_rate: Option<u32>,
-    },
+    InProgress { recording: bool },
+    Failed { error: String },
+    Complete { fps: u32, sample_rate: Option<u32> },
 }
 
 impl RecordingMeta {
@@ -151,6 +139,7 @@ impl RecordingMeta {
         let meta_path = project_path.join("recording-meta.json");
         let mut meta: Self = serde_json::from_str(&std::fs::read_to_string(&meta_path)?)?;
         meta.project_path = project_path.to_path_buf();
+        meta.normalize_paths();
 
         Ok(meta)
     }
@@ -165,7 +154,6 @@ impl RecordingMeta {
     pub fn project_config(&self) -> ProjectConfiguration {
         let mut config = ProjectConfiguration::load(&self.project_path).unwrap_or_default();
 
-        // Try to load captions from captions.json if it exists
         let captions_path = self.project_path.join("captions.json");
         debug!("Checking for captions at: {:?}", captions_path);
 
@@ -198,6 +186,72 @@ impl RecordingMeta {
         match &self.inner {
             RecordingMetaInner::Studio(meta) => Some(meta),
             _ => None,
+        }
+    }
+
+    fn normalize_paths(&mut self) {
+        let normalize_video = |meta: &mut VideoMeta| normalize_relative_path(&mut meta.path);
+        let normalize_audio = |meta: &mut AudioMeta| normalize_relative_path(&mut meta.path);
+        let normalize_cursor = |path: &mut Option<RelativePathBuf>| {
+            if let Some(path) = path {
+                normalize_relative_path(path);
+            }
+        };
+
+        match &mut self.inner {
+            RecordingMetaInner::Studio(meta) => match meta.as_mut() {
+                StudioRecordingMeta::SingleSegment { segment } => {
+                    normalize_video(&mut segment.display);
+                    if let Some(camera) = &mut segment.camera {
+                        normalize_video(camera);
+                    }
+                    if let Some(audio) = &mut segment.audio {
+                        normalize_audio(audio);
+                    }
+                    normalize_cursor(&mut segment.cursor);
+                }
+                StudioRecordingMeta::MultipleSegments { inner } => {
+                    for segment in &mut inner.segments {
+                        normalize_video(&mut segment.display);
+                        if let Some(camera) = &mut segment.camera {
+                            normalize_video(camera);
+                        }
+                        if let Some(mic) = &mut segment.mic {
+                            normalize_audio(mic);
+                        }
+                        if let Some(system_audio) = &mut segment.system_audio {
+                            normalize_audio(system_audio);
+                        }
+                        normalize_cursor(&mut segment.cursor);
+                    }
+
+                    if let Cursors::Correct(cursors) = &mut inner.cursors {
+                        for cursor in cursors.values_mut() {
+                            normalize_relative_path(&mut cursor.image_path);
+                        }
+                    }
+                }
+            },
+            RecordingMetaInner::Instant(_) => {}
+        }
+    }
+}
+
+fn normalize_relative_path(path: &mut RelativePathBuf) {
+    let original = path.as_str();
+    let normalized = original.replace('\\', "/");
+
+    if normalized.starts_with("content/")
+        || normalized.starts_with("screenshots/")
+        || normalized.starts_with("output/")
+    {
+        return;
+    }
+
+    for root in ["content/", "screenshots/", "output/"] {
+        if let Some(index) = normalized.find(root) {
+            *path = RelativePathBuf::from(&normalized[index..]);
+            return;
         }
     }
 }
@@ -291,6 +345,7 @@ pub struct MultipleSegments {
 #[serde(tag = "status")]
 pub enum StudioRecordingStatus {
     InProgress,
+    NeedsRemux,
     Failed { error: String },
     Complete,
 }
@@ -298,13 +353,12 @@ pub enum StudioRecordingStatus {
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(untagged, rename_all = "camelCase")]
 pub enum Cursors {
-    // needed for backwards compat as i wasn't strict enough with feature flagging 🤦
     Old(HashMap<String, String>),
     Correct(HashMap<String, CursorMeta>),
 }
 
 impl Cursors {
-    fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         match self {
             Cursors::Old(map) => map.is_empty(),
             Cursors::Correct(map) => map.is_empty(),
@@ -391,7 +445,6 @@ impl MultipleSegment {
 
         let full_path = meta.path(cursor_path);
 
-        // Try to load the cursor data
         let mut data = match CursorEvents::load_from_file(&full_path) {
             Ok(data) => data,
             Err(e) => {
@@ -429,6 +482,57 @@ impl MultipleSegment {
 
         Some(value)
     }
+
+    pub fn calculate_audio_offsets(&self) -> crate::ClipOffsets {
+        self.calculate_audio_offsets_with_calibration(None)
+    }
+
+    pub fn calculate_audio_offsets_with_calibration(
+        &self,
+        calibration_offset: Option<f32>,
+    ) -> crate::ClipOffsets {
+        let latest = match self.latest_start_time() {
+            Some(t) => t,
+            None => return crate::ClipOffsets::default(),
+        };
+
+        let cal_offset = calibration_offset.unwrap_or(0.0);
+
+        let camera_offset = self
+            .camera
+            .as_ref()
+            .and_then(|c| c.start_time)
+            .map(|t| (latest - t) as f32)
+            .unwrap_or(0.0);
+
+        let mic_offset = self
+            .mic
+            .as_ref()
+            .and_then(|m| m.start_time)
+            .map(|t| (latest - t) as f32 + cal_offset)
+            .unwrap_or(0.0);
+
+        let system_audio_offset = self
+            .system_audio
+            .as_ref()
+            .and_then(|s| s.start_time)
+            .map(|t| (latest - t) as f32 + cal_offset)
+            .unwrap_or(0.0);
+
+        crate::ClipOffsets {
+            camera: camera_offset,
+            mic: mic_offset,
+            system_audio: system_audio_offset,
+        }
+    }
+
+    pub fn camera_device_id(&self) -> Option<&str> {
+        self.camera.as_ref().and_then(|c| c.device_id.as_deref())
+    }
+
+    pub fn mic_device_id(&self) -> Option<&str> {
+        self.mic.as_ref().and_then(|m| m.device_id.as_deref())
+    }
 }
 
 #[cfg(test)]
@@ -462,26 +566,25 @@ mod test {
 
         test_meta_deserialize(
             r#"{
-		          "pretty_name": "Cap 2024-11-26 at 22.16.36",
-		          "sharing": null,
-		          "display": {
-		            "path": "content/display.mp4"
-		          },
-		          "camera": {
-		            "path": "content/camera.mp4"
-		          },
-		          "audio": {
-		            "path": "content/audio-input.mp3"
-		          },
-		          "segments": [],
-		          "cursor": "cursor.json"
-		        }"#,
+	          "pretty_name": "Cap 2024-11-26 at 22.16.36",
+	          "sharing": null,
+	          "display": {
+	            "path": "content/display.mp4"
+	          },
+	          "camera": {
+	            "path": "content/camera.mp4"
+	          },
+	          "audio": {
+	            "path": "content/audio-input.mp3"
+	          },
+	          "segments": [],
+	          "cursor": "cursor.json"
+	        }"#,
         );
     }
 
     #[test]
     fn multi_segment() {
-        // single segment
         test_meta_deserialize(
             r#"{
               "pretty_name": "Cap 2024-11-26 at 22.29.30",
@@ -508,36 +611,35 @@ mod test {
             }"#,
         );
 
-        // multi segment, no cursor
         test_meta_deserialize(
             r#"{
-		          "pretty_name": "Cap 2024-11-26 at 22.32.26",
-		          "sharing": null,
-		          "segments": [
-		            {
-		              "display": {
-		                "path": "content/segments/segment-0/display.mp4"
-		              },
-		              "camera": {
-		                "path": "content/segments/segment-0/camera.mp4"
-		              },
-		              "audio": {
-		                "path": "content/segments/segment-0/audio-input.mp3"
-		              }
-		            },
-		            {
-		              "display": {
-		                "path": "content/segments/segment-1/display.mp4"
-		              },
-		              "camera": {
-		                "path": "content/segments/segment-1/camera.mp4"
-		              },
-		              "audio": {
-		                "path": "content/segments/segment-1/audio-input.mp3"
-		              }
-		            }
-		          ]
-		        }"#,
+	          "pretty_name": "Cap 2024-11-26 at 22.32.26",
+	          "sharing": null,
+	          "segments": [
+	            {
+	              "display": {
+	                "path": "content/segments/segment-0/display.mp4"
+	              },
+	              "camera": {
+	                "path": "content/segments/segment-0/camera.mp4"
+	              },
+	              "audio": {
+	                "path": "content/segments/segment-0/audio-input.mp3"
+	              }
+	            },
+	            {
+	              "display": {
+	                "path": "content/segments/segment-1/display.mp4"
+	              },
+	              "camera": {
+	                "path": "content/segments/segment-1/camera.mp4"
+	              },
+	              "audio": {
+	                "path": "content/segments/segment-1/audio-input.mp3"
+	              }
+	            }
+	          ]
+	        }"#,
         );
     }
 }

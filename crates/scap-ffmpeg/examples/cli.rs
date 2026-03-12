@@ -3,33 +3,43 @@ pub async fn main() {
     #[cfg(windows)]
     {
         use scap_direct3d::*;
+        use scap_targets::Display;
+        use std::time::Duration;
 
-        let display = Display::primary().unwrap();
+        let display = Display::primary();
 
-        let capturer = Capturer::new(
-            display.try_as_capture_item().unwrap(),
+        let mut capturer = Capturer::new(
+            display.raw_handle().try_as_capture_item().unwrap(),
             Settings {
                 is_border_required: Some(true),
                 is_cursor_capture_enabled: Some(true),
                 pixel_format: PixelFormat::R8G8B8A8Unorm,
+                ..Default::default()
             },
-        );
-
-        let capture_handle = capturer
-            .start(|frame| {
+            |frame| {
                 use scap_ffmpeg::AsFFmpeg;
 
                 let ff_frame = frame.as_ffmpeg()?;
 
-                dbg!(ff_frame.width(), ff_frame.height(), ff_frame.format());
+                println!(
+                    "Frame: {}x{} format={:?}",
+                    ff_frame.width(),
+                    ff_frame.height(),
+                    ff_frame.format()
+                );
 
                 Ok(())
-            })
-            .unwrap();
+            },
+            || Ok(()),
+            None,
+        )
+        .unwrap();
+
+        capturer.start().unwrap();
 
         std::thread::sleep(Duration::from_secs(3));
 
-        capture_handle.stop().unwrap();
+        capturer.stop().unwrap();
 
         std::thread::sleep(Duration::from_secs(3));
     }
@@ -39,7 +49,6 @@ pub async fn main() {
         use std::time::Duration;
 
         use cidre::sc;
-        use futures::executor::block_on;
         use scap_screencapturekit::*;
         use scap_targets::Display;
 
@@ -51,12 +60,9 @@ pub async fn main() {
             .with_height(display.physical_size().unwrap().height() as usize)
             .build();
 
+        let content = sc::ShareableContent::current().await.unwrap();
         let capturer = Capturer::builder(
-            display
-                .raw_handle()
-                .as_content_filter(sc::ShareableContent::current().await.unwrap())
-                .await
-                .unwrap(),
+            display.raw_handle().as_content_filter(content).unwrap(),
             config,
         )
         .with_output_sample_buf_cb(|frame| {
@@ -76,11 +82,11 @@ pub async fn main() {
         .build()
         .expect("Failed to build capturer");
 
-        block_on(capturer.start()).expect("Failed to start capturing");
+        capturer.start().await.expect("Failed to start capturing");
 
         std::thread::sleep(Duration::from_secs(3));
 
-        block_on(capturer.stop()).expect("Failed to stop capturing");
+        capturer.stop().await.expect("Failed to stop capturing");
 
         std::thread::sleep(Duration::from_secs(1));
     }

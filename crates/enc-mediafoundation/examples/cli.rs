@@ -18,7 +18,7 @@ mod win {
         Foundation::{Metadata::ApiInformation, TimeSpan},
         Graphics::Capture::GraphicsCaptureSession,
         Win32::{
-            Media::MediaFoundation::{self, MFSTARTUP_FULL, MFStartup},
+            Media::MediaFoundation::{MFSTARTUP_FULL, MFStartup},
             System::{
                 Diagnostics::Debug::{DebugBreak, IsDebuggerPresent},
                 Threading::GetCurrentProcessId,
@@ -44,7 +44,7 @@ mod win {
 
         if wait_for_debugger {
             let pid = unsafe { GetCurrentProcessId() };
-            println!("Waiting for a debugger to attach (PID: {})...", pid);
+            println!("Waiting for a debugger to attach (PID: {pid})...");
             loop {
                 if unsafe { IsDebuggerPresent().into() } {
                     break;
@@ -64,10 +64,7 @@ mod win {
         }
 
         if verbose {
-            println!(
-                "Using index \"{}\" and path \"{}\".",
-                display_index, output_path
-            );
+            println!("Using index \"{display_index}\" and path \"{output_path}\".");
         }
 
         let item = Display::primary()
@@ -77,7 +74,7 @@ mod win {
 
         // Resolve encoding settings
         let resolution = item.Size()?;
-        let bit_rate = bit_rate * 1000000;
+        let _bit_rate = bit_rate * 1000000;
 
         // Start the recording
         {
@@ -125,7 +122,7 @@ mod win {
             )
             .unwrap();
 
-            let output_path = std::env::current_dir().unwrap().join(output_path);
+            let _output_path = std::env::current_dir().unwrap().join(output_path);
 
             // let sample_writer = Arc::new(SampleWriter::new(output_path.as_path())?);
 
@@ -143,8 +140,7 @@ mod win {
                         .run(
                             should_stop_encoder,
                             || Ok(frame_rx.recv().ok().flatten()),
-                            |sample| {
-                                dbg!(sample);
+                            |_sample| {
                                 Ok(())
                                 // sample_writer.write(stream_index, &output_sample).unwrap()
                             },
@@ -217,7 +213,7 @@ mod win {
     }
 
     fn exit_with_error(message: &str) -> ! {
-        println!("{}", message);
+        println!("{message}");
         std::process::exit(1);
     }
 
@@ -290,6 +286,7 @@ mod win {
         }
     }
 
+    #[allow(dead_code)]
     mod hotkey {
         use std::sync::atomic::{AtomicI32, Ordering};
         use windows::{

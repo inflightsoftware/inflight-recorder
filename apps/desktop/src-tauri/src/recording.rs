@@ -46,8 +46,8 @@ use tracing::*;
 
 use crate::web_api::AuthedApiError;
 use crate::{
-    App, CurrentRecordingChanged, MutableState, NewNotification, NewStudioRecordingAdded, RecordingState,
-    RecordingStopped, VideoUploadInfo,
+    App, CurrentRecordingChanged, MutableState, NewNotification, NewStudioRecordingAdded,
+    RecordingState, RecordingStopped, VideoUploadInfo,
     api::PresignedS3PutRequestMethod,
     audio::AppSounds,
     auth::AuthStore,

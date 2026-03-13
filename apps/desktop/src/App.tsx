@@ -1,7 +1,10 @@
 import { Router, useCurrentMatches } from "@solidjs/router";
 import { FileRoutes } from "@solidjs/start/router";
 import { QueryClient, QueryClientProvider } from "@tanstack/solid-query";
-import { getCurrentWebviewWindow, type WebviewWindow } from "@tauri-apps/api/webviewWindow";
+import {
+	getCurrentWebviewWindow,
+	type WebviewWindow,
+} from "@tauri-apps/api/webviewWindow";
 import { message } from "@tauri-apps/plugin-dialog";
 import { createEffect, onCleanup, onMount, Suspense } from "solid-js";
 import toast, { Toaster } from "solid-toast";
@@ -129,7 +132,9 @@ function createThemeListener(currentWindow: WebviewWindow) {
 	});
 
 	onMount(async () => {
-		const unlisten = await currentWindow.onThemeChanged((_) => update(generalSettings.data?.theme));
+		const unlisten = await currentWindow.onThemeChanged((_) =>
+			update(generalSettings.data?.theme),
+		);
 		onCleanup(() => unlisten?.());
 	});
 
@@ -141,7 +146,8 @@ function createThemeListener(currentWindow: WebviewWindow) {
 		commands.setTheme(appTheme).then(() => {
 			document.documentElement.classList.toggle(
 				"dark",
-				appTheme === "dark" || window.matchMedia("(prefers-color-scheme: dark)").matches,
+				appTheme === "dark" ||
+					window.matchMedia("(prefers-color-scheme: dark)").matches,
 			);
 		});
 	}

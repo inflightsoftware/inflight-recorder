@@ -145,7 +145,6 @@ fn default_instant_mode_max_resolution() -> u32 {
     1920
 }
 
-
 #[derive(Serialize, Deserialize, Type, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct CommercialLicense {

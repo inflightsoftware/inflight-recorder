@@ -246,7 +246,7 @@ impl ScreenCaptureConfig<CMSampleBufferCapture> {
             );
             AreaCaptureInfo {
                 area_bounds: absolute_bounds,
-                display: display.clone(),
+                display,
                 shareable_content: self.shareable_content.clone(),
                 base_excluded_windows: self.excluded_windows.clone(),
             }

@@ -655,33 +655,33 @@ pub async fn start_recording(
 
                 let mut excluded = crate::window_exclusion::resolve_window_ids(&window_exclusions);
 
-                if let ScreenCaptureTarget::Area { bounds, screen } = &inputs.capture_target {
-                    if let Some(display) = scap_targets::Display::from_id(screen) {
-                        #[cfg(target_os = "macos")]
-                        let display_position = display.raw_handle().logical_position();
-                        #[cfg(windows)]
-                        let display_position = display.raw_handle().physical_position().unwrap();
-                        let absolute_bounds = scap_targets::bounds::LogicalBounds::new(
-                            scap_targets::bounds::LogicalPosition::new(
-                                bounds.position().x() + display_position.x(),
-                                bounds.position().y() + display_position.y(),
-                            ),
-                            bounds.size(),
-                        );
+                if let ScreenCaptureTarget::Area { bounds, screen } = &inputs.capture_target
+                    && let Some(display) = scap_targets::Display::from_id(screen)
+                {
+                    #[cfg(target_os = "macos")]
+                    let display_position = display.raw_handle().logical_position();
+                    #[cfg(windows)]
+                    let display_position = display.raw_handle().physical_position().unwrap();
+                    let absolute_bounds = scap_targets::bounds::LogicalBounds::new(
+                        scap_targets::bounds::LogicalPosition::new(
+                            bounds.position().x() + display_position.x(),
+                            bounds.position().y() + display_position.y(),
+                        ),
+                        bounds.size(),
+                    );
 
-                        let background_windows =
-                            scap_targets::Window::get_background_windows_in_area(&absolute_bounds);
+                    let background_windows =
+                        scap_targets::Window::get_background_windows_in_area(&absolute_bounds);
 
-                        for window in background_windows {
-                            let window_id = window.id();
-                            if !excluded.contains(&window_id) {
-                                debug!(
-                                    "Excluding background window: {:?} (owner: {:?})",
-                                    window.name(),
-                                    window.owner_name()
-                                );
-                                excluded.push(window_id);
-                            }
+                    for window in background_windows {
+                        let window_id = window.id();
+                        if !excluded.contains(&window_id) {
+                            debug!(
+                                "Excluding background window: {:?} (owner: {:?})",
+                                window.name(),
+                                window.owner_name()
+                            );
+                            excluded.push(window_id);
                         }
                     }
                 }

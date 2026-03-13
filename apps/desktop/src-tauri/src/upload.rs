@@ -1056,7 +1056,7 @@ async fn upload_camera_fallback(
 async fn upload_cursor_file(
     app: &AppHandle,
     video_id: &str,
-    recording_dir: &PathBuf,
+    recording_dir: &Path,
 ) -> Result<(), String> {
     let cursor_path = recording_dir.join("content/cursor.json");
     if !cursor_path.exists() {
@@ -1167,16 +1167,14 @@ pub async fn upload_instant_recording(
             .ok();
     }
 
-    if !camera_upload_succeeded {
-        if let Some(camera_path) = camera_output_path {
-            upload_camera_fallback(app, &video_upload_info.id, camera_path)
-                .await
-                .map_err(|e| {
-                    error!("{e}");
-                    e
-                })
-                .ok();
-        }
+    if !camera_upload_succeeded && let Some(camera_path) = camera_output_path {
+        upload_camera_fallback(app, &video_upload_info.id, camera_path)
+            .await
+            .map_err(|e| {
+                error!("{e}");
+                e
+            })
+            .ok();
     }
 
     Ok(())

@@ -5,8 +5,7 @@ use cap_project::cursor::SHORT_CURSOR_SHAPE_DEBOUNCE_MS;
 use cap_project::{
     CursorClickEvent, InstantRecordingMeta, MultipleSegments, Platform, ProjectConfiguration,
     RecordingMeta, RecordingMetaInner, SharingMeta, StudioRecordingMeta, StudioRecordingStatus,
-    TimelineConfiguration, TimelineSegment, UploadMeta, ZoomMode, ZoomSegment,
-    cursor::CursorEvents,
+    TimelineConfiguration, TimelineSegment, ZoomMode, ZoomSegment, cursor::CursorEvents,
 };
 use cap_recording::feeds::camera::CameraFeedLock;
 #[cfg(target_os = "macos")]
@@ -24,9 +23,7 @@ use cap_recording::{
 };
 use cap_rendering::ProjectRecordingsMeta;
 use cap_utils::{ensure_dir, spawn_actor};
-use futures::{FutureExt, stream};
-#[cfg(target_os = "macos")]
-use scap_targets;
+use futures::FutureExt;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use std::{
@@ -48,7 +45,6 @@ use crate::web_api::AuthedApiError;
 use crate::{
     App, CurrentRecordingChanged, MutableState, NewNotification, NewStudioRecordingAdded,
     RecordingState, RecordingStopped, VideoUploadInfo,
-    api::PresignedS3PutRequestMethod,
     audio::AppSounds,
     auth::AuthStore,
     create_screenshot,
@@ -58,10 +54,7 @@ use crate::{
     open_external_link,
     presets::PresetsStore,
     thumbnails::*,
-    upload::{
-        InstantMultipartUpload, build_video_meta, compress_image, create_or_get_video,
-        upload_instant_recording, upload_video,
-    },
+    upload::{InstantMultipartUpload, create_or_get_video, upload_instant_recording},
     web_api::ManagerExt,
     windows::{CapWindowId, ShowCapWindow},
 };
@@ -470,13 +463,6 @@ pub async fn start_recording(
         }
         RecordingMode::Studio => None,
         RecordingMode::Screenshot => return Err("Use take_screenshot for screenshots".to_string()),
-    };
-
-    let date_time = if cfg!(windows) {
-        // Windows doesn't support colon in file paths
-        chrono::Local::now().format("%Y-%m-%d %H.%M.%S")
-    } else {
-        chrono::Local::now().format("%Y-%m-%d %H:%M:%S")
     };
 
     let meta = RecordingMeta {

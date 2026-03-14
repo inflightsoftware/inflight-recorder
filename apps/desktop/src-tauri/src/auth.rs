@@ -4,12 +4,7 @@ use specta::Type;
 use tauri::{AppHandle, Runtime};
 use tauri_plugin_store::StoreExt;
 
-use web_api::ManagerExt;
-
-use crate::{
-    api::{self, Organization, Workspace},
-    web_api,
-};
+use crate::api::{self, Organization, Workspace};
 
 #[derive(Serialize, Deserialize, Type, Debug)]
 pub struct AuthStore {

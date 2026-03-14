@@ -9,7 +9,7 @@ use crate::{
 };
 use async_stream::{stream, try_stream};
 use bytes::Bytes;
-use cap_project::{RecordingMeta, S3UploadMeta, UploadMeta};
+use cap_project::S3UploadMeta;
 use cap_utils::spawn_actor;
 use ffmpeg::ffi::AV_TIME_BASE;
 use flume::Receiver;
@@ -156,10 +156,10 @@ pub async fn upload_video(
     let _ = (video_result?, thumbnail_result?);
 
     // Use version_id for link if available, otherwise fall back to recording id
-    let (link_path, link_id) = if let Some(ref v_id) = version_id {
-        (format!("/v/{}", v_id), v_id.clone())
+    let link_path = if let Some(ref v_id) = version_id {
+        format!("/v/{}", v_id)
     } else {
-        (format!("/s/{}", video_id), video_id.clone())
+        format!("/s/{}", video_id)
     };
 
     Ok(UploadedItem {
@@ -408,7 +408,7 @@ impl InstantMultipartUpload {
         file_path: PathBuf,
         pre_created_video: VideoUploadInfo,
         subpath: String,
-        recording_dir: PathBuf,
+        _recording_dir: PathBuf,
         realtime_video_done: Option<Receiver<()>>,
     ) -> Result<Option<S3VideoMeta>, AuthedApiError> {
         let video_id = pre_created_video.id.clone();

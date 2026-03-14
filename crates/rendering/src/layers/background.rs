@@ -550,7 +550,7 @@ mod tests {
                 assert_eq!(gradient.end[0], 0.0);
                 assert_eq!(gradient.end[1], 0.0);
                 assert_eq!(gradient.end[2], 1.0); // Blue in linear
-                assert_eq!(gradient.end[3], 0.0); // Alpha 0/255 = 0.0
+                assert_eq!(gradient.end[3], 1.0); // Gradient stops are always fully opaque
                 assert_eq!(gradient.angle, 90.0);
             }
             _ => panic!("Expected Gradient variant"),

@@ -56,16 +56,14 @@ impl From<BackgroundSource> for Background {
 
 /// Skia-based background layer with picture caching
 pub struct BackgroundLayer {
-    // Current background configuration
     current_background: Option<Background>,
     current_border: Option<cap_project::BorderConfiguration>,
+    current_output_size: (u32, u32),
 
-    // Track what we rendered last to detect changes
     last_rendered_background: Option<Background>,
     last_rendered_border: Option<cap_project::BorderConfiguration>,
     last_rendered_size: (u32, u32),
 
-    // For image backgrounds
     image_path: Option<PathBuf>,
     loaded_image: Option<Image>,
 }
@@ -75,6 +73,7 @@ impl BackgroundLayer {
         Self {
             current_background: None,
             current_border: None,
+            current_output_size: (0, 0),
             last_rendered_background: None,
             last_rendered_border: None,
             last_rendered_size: (0, 0),
@@ -266,10 +265,9 @@ impl RecordableLayer for BackgroundLayer {
         let new_border = uniforms.border.clone();
         let new_size = uniforms.output_size;
 
-        // Check against what was last rendered, not what's currently prepared
-        self.last_rendered_background.as_ref() != Some(&new_background)
-            || self.last_rendered_border != new_border
-            || self.last_rendered_size != new_size
+        self.current_background.as_ref() != Some(&new_background)
+            || self.current_border != new_border
+            || self.current_output_size != new_size
     }
 
     fn prepare(&mut self, frame_data: &FrameData) -> Result<(), SkiaRenderingError> {
@@ -307,9 +305,9 @@ impl RecordableLayer for BackgroundLayer {
             _ => {}
         }
 
-        // Update current state (but not last_rendered, that happens in record())
         self.current_background = Some(new_background);
         self.current_border = frame_data.uniforms.border.clone();
+        self.current_output_size = frame_data.uniforms.output_size;
 
         Ok(())
     }

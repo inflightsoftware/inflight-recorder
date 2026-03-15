@@ -72,9 +72,7 @@ fn benchmark_pool(
         }
         let stats = pool.stats();
         if stats.frames_converted >= frame_count as u64 {
-            while pool.try_recv().is_some() {
-                received += 1;
-            }
+            while pool.try_recv().is_some() {}
             break;
         }
     }

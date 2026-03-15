@@ -406,7 +406,7 @@ fn main() {
         "encode" => benchmark_encode_times(&config),
         "workers" => benchmark_worker_counts(&config),
         "resolutions" => benchmark_resolutions(&config),
-        "full" | _ => {
+        _ => {
             benchmark_conversion_formats(&config);
             benchmark_encode_times(&config);
             benchmark_worker_counts(&config);

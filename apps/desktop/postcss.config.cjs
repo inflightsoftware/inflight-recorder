@@ -1,1 +1,1 @@
-module.exports = require("@inflight/ui/postcss");
+module.exports = require("@inflight/ui-solid/postcss");

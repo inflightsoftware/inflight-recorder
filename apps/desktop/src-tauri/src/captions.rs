@@ -1012,13 +1012,11 @@ fn start_whisperx_server(
     std::thread::spawn(move || {
         use std::io::BufRead;
         let reader = std::io::BufReader::new(stderr);
-        for line in reader.lines() {
-            if let Ok(line) = line {
-                if line.starts_with("STDERR:") {
-                    log::info!("[WhisperX] {}", &line[7..]);
-                } else {
-                    log::info!("[WhisperX stderr] {}", line);
-                }
+        for line in reader.lines().map_while(Result::ok) {
+            if let Some(stripped) = line.strip_prefix("STDERR:") {
+                log::info!("[WhisperX] {}", stripped);
+            } else {
+                log::info!("[WhisperX stderr] {}", line);
             }
         }
     });

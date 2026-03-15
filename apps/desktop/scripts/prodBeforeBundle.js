@@ -1,12 +1,12 @@
 // @ts-check
 
-import { exec as execCb } from "node:child_process";
+import { execFile as execFileCb } from "node:child_process";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
-const exec = promisify(execCb);
+const execFile = promisify(execFileCb);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -36,9 +36,11 @@ async function main() {
 
 		const binaryPath = path.join(releaseDir, releaseFile);
 
-		await exec(
-			`dsymutil "${binaryPath}" -o "${path.join(targetDir, releaseFile)}.dSYM"`,
-		);
+		await execFile("dsymutil", [
+			binaryPath,
+			"-o",
+			`${path.join(targetDir, releaseFile)}.dSYM`,
+		]);
 	}
 }
 

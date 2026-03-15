@@ -1958,7 +1958,7 @@ fn list_screenshots(app: AppHandle) -> Result<Vec<(PathBuf, RecordingMeta)>, Str
 #[specta::specta]
 #[instrument(skip(app))]
 async fn check_upgraded_and_update(app: AppHandle) -> Result<bool, String> {
-    println!("Checking upgraded status and updating...");
+    tracing::debug!("Checking upgraded status and updating");
 
     if let Ok(Some(settings)) = GeneralSettingsStore::get(&app)
         && settings.commercial_license.is_some()
@@ -1967,7 +1967,7 @@ async fn check_upgraded_and_update(app: AppHandle) -> Result<bool, String> {
     }
 
     let Ok(Some(auth)) = AuthStore::get(&app) else {
-        println!("No auth found, clearing auth store");
+        tracing::debug!("No auth found, clearing auth store");
         AuthStore::set(&app, None).map_err(|e| e.to_string())?;
         return Ok(false);
     };
@@ -1978,21 +1978,18 @@ async fn check_upgraded_and_update(app: AppHandle) -> Result<bool, String> {
         return Ok(true);
     }
 
-    println!(
-        "Fetching plan for user {}",
-        auth.user_id.as_deref().unwrap_or("unknown")
-    );
+    tracing::debug!("Fetching plan for user");
     let response = app
         .authed_api_request("/api/desktop/plan", |client, url| client.get(url))
         .await
         .map_err(|e| {
-            println!("Failed to fetch plan: {e}");
+            tracing::warn!("Failed to fetch plan: {e}");
             e.to_string()
         })?;
 
-    println!("Plan fetch response status: {}", response.status());
+    tracing::debug!("Plan fetch response status: {}", response.status());
     let plan_data = response.json::<serde_json::Value>().await.map_err(|e| {
-        println!("Failed to parse plan response: {e}");
+        tracing::warn!("Failed to parse plan response: {e}");
         format!("Failed to parse plan response: {e}")
     })?;
 
@@ -2000,7 +1997,7 @@ async fn check_upgraded_and_update(app: AppHandle) -> Result<bool, String> {
         .get("upgraded")
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
-    println!("Pro status: {is_pro}");
+    tracing::debug!("Pro status: {is_pro}");
     let updated_auth = AuthStore {
         secret: auth.secret,
         user_id: auth.user_id,

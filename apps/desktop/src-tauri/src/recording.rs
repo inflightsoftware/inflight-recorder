@@ -5,8 +5,7 @@ use cap_project::cursor::SHORT_CURSOR_SHAPE_DEBOUNCE_MS;
 use cap_project::{
     CursorClickEvent, InstantRecordingMeta, MultipleSegments, Platform, ProjectConfiguration,
     RecordingMeta, RecordingMetaInner, SharingMeta, StudioRecordingMeta, StudioRecordingStatus,
-    TimelineConfiguration, TimelineSegment, UploadMeta, ZoomMode, ZoomSegment,
-    cursor::CursorEvents,
+    TimelineConfiguration, TimelineSegment, ZoomMode, ZoomSegment, cursor::CursorEvents,
 };
 use cap_recording::feeds::camera::CameraFeedLock;
 #[cfg(target_os = "macos")]
@@ -24,9 +23,7 @@ use cap_recording::{
 };
 use cap_rendering::ProjectRecordingsMeta;
 use cap_utils::{ensure_dir, spawn_actor};
-use futures::{FutureExt, stream};
-#[cfg(target_os = "macos")]
-use scap_targets;
+use futures::FutureExt;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use std::{
@@ -46,9 +43,8 @@ use tracing::*;
 
 use crate::web_api::AuthedApiError;
 use crate::{
-    App, CurrentRecordingChanged, MutableState, NewNotification, NewStudioRecordingAdded, RecordingState,
-    RecordingStopped, VideoUploadInfo,
-    api::PresignedS3PutRequestMethod,
+    App, CurrentRecordingChanged, MutableState, NewNotification, NewStudioRecordingAdded,
+    RecordingState, RecordingStopped, VideoUploadInfo,
     audio::AppSounds,
     auth::AuthStore,
     create_screenshot,
@@ -58,10 +54,7 @@ use crate::{
     open_external_link,
     presets::PresetsStore,
     thumbnails::*,
-    upload::{
-        InstantMultipartUpload, build_video_meta, compress_image, create_or_get_video,
-        upload_instant_recording, upload_video,
-    },
+    upload::{InstantMultipartUpload, create_or_get_video, upload_instant_recording},
     web_api::ManagerExt,
     windows::{CapWindowId, ShowCapWindow},
 };
@@ -472,13 +465,6 @@ pub async fn start_recording(
         RecordingMode::Screenshot => return Err("Use take_screenshot for screenshots".to_string()),
     };
 
-    let date_time = if cfg!(windows) {
-        // Windows doesn't support colon in file paths
-        chrono::Local::now().format("%Y-%m-%d %H.%M.%S")
-    } else {
-        chrono::Local::now().format("%Y-%m-%d %H:%M:%S")
-    };
-
     let meta = RecordingMeta {
         platform: Some(Platform::default()),
         project_path: recording_dir.clone(),
@@ -655,33 +641,33 @@ pub async fn start_recording(
 
                 let mut excluded = crate::window_exclusion::resolve_window_ids(&window_exclusions);
 
-                if let ScreenCaptureTarget::Area { bounds, screen } = &inputs.capture_target {
-                    if let Some(display) = scap_targets::Display::from_id(screen) {
-                        #[cfg(target_os = "macos")]
-                        let display_position = display.raw_handle().logical_position();
-                        #[cfg(windows)]
-                        let display_position = display.raw_handle().physical_position().unwrap();
-                        let absolute_bounds = scap_targets::bounds::LogicalBounds::new(
-                            scap_targets::bounds::LogicalPosition::new(
-                                bounds.position().x() + display_position.x(),
-                                bounds.position().y() + display_position.y(),
-                            ),
-                            bounds.size(),
-                        );
+                if let ScreenCaptureTarget::Area { bounds, screen } = &inputs.capture_target
+                    && let Some(display) = scap_targets::Display::from_id(screen)
+                {
+                    #[cfg(target_os = "macos")]
+                    let display_position = display.raw_handle().logical_position();
+                    #[cfg(windows)]
+                    let display_position = display.raw_handle().physical_position().unwrap();
+                    let absolute_bounds = scap_targets::bounds::LogicalBounds::new(
+                        scap_targets::bounds::LogicalPosition::new(
+                            bounds.position().x() + display_position.x(),
+                            bounds.position().y() + display_position.y(),
+                        ),
+                        bounds.size(),
+                    );
 
-                        let background_windows =
-                            scap_targets::Window::get_background_windows_in_area(&absolute_bounds);
+                    let background_windows =
+                        scap_targets::Window::get_background_windows_in_area(&absolute_bounds);
 
-                        for window in background_windows {
-                            let window_id = window.id();
-                            if !excluded.contains(&window_id) {
-                                debug!(
-                                    "Excluding background window: {:?} (owner: {:?})",
-                                    window.name(),
-                                    window.owner_name()
-                                );
-                                excluded.push(window_id);
-                            }
+                    for window in background_windows {
+                        let window_id = window.id();
+                        if !excluded.contains(&window_id) {
+                            debug!(
+                                "Excluding background window: {:?} (owner: {:?})",
+                                window.name(),
+                                window.owner_name()
+                            );
+                            excluded.push(window_id);
                         }
                     }
                 }

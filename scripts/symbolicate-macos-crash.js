@@ -1,13 +1,13 @@
 // populates an unsymbolicated crash report's 'crashed' section with symbols
 // reference: https://developer.apple.com/documentation/xcode/adding-identifiable-symbol-names-to-a-crash-report#Symbolicate-the-crash-report-with-the-command-line
 
-import { exec as execCb } from "node:child_process";
+import { execFile as execFileCb } from "node:child_process";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
-const exec = promisify(execCb);
+const execFile = promisify(execFileCb);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -36,9 +36,13 @@ async function main() {
 		if (!loadAddressOrSymbol.startsWith("0x")) continue;
 		const loadAddress = loadAddressOrSymbol;
 
-		const symbol = await exec(
-			`atos -o "${targetDir}/Cap.dSYM" -l ${loadAddress} ${address}`,
-		).then((s) => s.stdout.trim());
+		const symbol = await execFile("atos", [
+			"-o",
+			`${targetDir}/Cap.dSYM`,
+			"-l",
+			loadAddress,
+			address,
+		]).then((s) => s.stdout.trim());
 
 		const loadAddressIndex = line.indexOf(loadAddress);
 		crashedSectionLines[i] =

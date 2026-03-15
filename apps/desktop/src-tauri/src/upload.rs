@@ -9,7 +9,7 @@ use crate::{
 };
 use async_stream::{stream, try_stream};
 use bytes::Bytes;
-use cap_project::{RecordingMeta, S3UploadMeta, UploadMeta};
+use cap_project::S3UploadMeta;
 use cap_utils::spawn_actor;
 use ffmpeg::ffi::AV_TIME_BASE;
 use flume::Receiver;
@@ -156,10 +156,10 @@ pub async fn upload_video(
     let _ = (video_result?, thumbnail_result?);
 
     // Use version_id for link if available, otherwise fall back to recording id
-    let (link_path, link_id) = if let Some(ref v_id) = version_id {
-        (format!("/v/{}", v_id), v_id.clone())
+    let link_path = if let Some(ref v_id) = version_id {
+        format!("/v/{}", v_id)
     } else {
-        (format!("/s/{}", video_id), video_id.clone())
+        format!("/s/{}", video_id)
     };
 
     Ok(UploadedItem {
@@ -408,7 +408,7 @@ impl InstantMultipartUpload {
         file_path: PathBuf,
         pre_created_video: VideoUploadInfo,
         subpath: String,
-        recording_dir: PathBuf,
+        _recording_dir: PathBuf,
         realtime_video_done: Option<Receiver<()>>,
     ) -> Result<Option<S3VideoMeta>, AuthedApiError> {
         let video_id = pre_created_video.id.clone();
@@ -1056,7 +1056,7 @@ async fn upload_camera_fallback(
 async fn upload_cursor_file(
     app: &AppHandle,
     video_id: &str,
-    recording_dir: &PathBuf,
+    recording_dir: &Path,
 ) -> Result<(), String> {
     let cursor_path = recording_dir.join("content/cursor.json");
     if !cursor_path.exists() {
@@ -1167,16 +1167,14 @@ pub async fn upload_instant_recording(
             .ok();
     }
 
-    if !camera_upload_succeeded {
-        if let Some(camera_path) = camera_output_path {
-            upload_camera_fallback(app, &video_upload_info.id, camera_path)
-                .await
-                .map_err(|e| {
-                    error!("{e}");
-                    e
-                })
-                .ok();
-        }
+    if !camera_upload_succeeded && let Some(camera_path) = camera_output_path {
+        upload_camera_fallback(app, &video_upload_info.id, camera_path)
+            .await
+            .map_err(|e| {
+                error!("{e}");
+                e
+            })
+            .ok();
     }
 
     Ok(())

@@ -89,14 +89,12 @@ async fn run_recording_benchmark(
         println!("  Bitrate: {bitrate_mbps:.2} Mbps");
     }
 
-    if include_camera {
-        if let Ok(metadata) = std::fs::metadata(content_dir.join("camera.mp4")) {
-            let size_mb = metadata.len() as f64 / (1024.0 * 1024.0);
-            let bitrate_mbps = size_mb * 8.0 / config.duration_secs as f64;
-            println!("\nCamera recording:");
-            println!("  Size: {size_mb:.2} MB");
-            println!("  Bitrate: {bitrate_mbps:.2} Mbps");
-        }
+    if include_camera && let Ok(metadata) = std::fs::metadata(content_dir.join("camera.mp4")) {
+        let size_mb = metadata.len() as f64 / (1024.0 * 1024.0);
+        let bitrate_mbps = size_mb * 8.0 / config.duration_secs as f64;
+        println!("\nCamera recording:");
+        println!("  Size: {size_mb:.2} MB");
+        println!("  Bitrate: {bitrate_mbps:.2} Mbps");
     }
 
     std::mem::forget(dir);
@@ -265,7 +263,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .unwrap_or(5);
             stress_test_recording(cycles, config.duration_secs).await?;
         }
-        "full" | _ => {
+        _ => {
             println!("Mode: Full benchmark suite\n");
 
             println!("--- Screen Recording ---");

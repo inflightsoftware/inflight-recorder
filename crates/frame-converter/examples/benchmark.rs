@@ -72,9 +72,7 @@ fn benchmark_pool(
         }
         let stats = pool.stats();
         if stats.frames_converted >= frame_count as u64 {
-            while pool.try_recv().is_some() {
-                received += 1;
-            }
+            while pool.try_recv().is_some() {}
             break;
         }
     }
@@ -245,11 +243,7 @@ fn simulate_realtime_pipeline(
     println!("  Total encode time: {encode_time_total:?}");
 
     let expected_duration = Duration::from_secs_f64(total_frames as f64 / target_fps);
-    let overhead = if elapsed > expected_duration {
-        elapsed - expected_duration
-    } else {
-        Duration::ZERO
-    };
+    let overhead = elapsed.saturating_sub(expected_duration);
     println!("  Processing overhead: {overhead:?}");
 
     if stats.frames_dropped == 0 {

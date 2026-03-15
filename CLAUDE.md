@@ -4,25 +4,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Inflight Recorder is a video messaging tool (fork of Cap, the open source Loom alternative). It's a Turborepo monorepo with a Tauri v2 desktop app (Rust + SolidStart) and a Next.js web app.
+Inflight Recorder is a desktop screen recording tool (fork of Cap, the open source Loom alternative). It's a Turborepo monorepo with a Tauri v2 desktop app (Rust + SolidStart).
 
-**Core Applications:**
-- `apps/web` — Next.js 15 (App Router) web application for sharing, management, dashboard
+**Application:**
 - `apps/desktop` — Tauri v2 desktop app with SolidStart (recording, editing)
-- `apps/cli` — Rust CLI tool
-- `apps/discord-bot` — Discord integration bot
-- `apps/storybook` — UI component documentation
+  - Frontend: `src/` (SolidStart routes, components, stores)
+  - Backend: `src-tauri/src/` (Rust IPC commands, events, platform-specific code)
 
 **Shared Packages:**
-- `packages/database` — Drizzle ORM (MySQL), auth utilities, email templates
-- `packages/ui` — React components for web
-- `packages/ui-solid` — SolidJS components for desktop
-- `packages/utils` — Shared utilities and types
-- `packages/env` — Zod-validated environment modules
-- `packages/web-domain` — Shared domain types (Video, User, Organisation, etc.)
-- `packages/web-backend` — Effect-based backend services (Videos, S3Buckets, Users, etc.)
-- `packages/web-api-contract` — ts-rest API contracts for desktop
-- `packages/web-api-contract-effect` — Effect-based HTTP API contracts
+- `packages/ui-solid` — SolidJS components for desktop (Kobalte + TailwindCSS)
+- `packages/web-api-contract` — ts-rest API contracts for desktop license/API communication
+- `packages/config` — Shared TypeScript and Vite configuration
+- `packages/tsconfig` — Base TypeScript configuration
 
 **Rust Crates** (`crates/*`):
 - `recording` — Core recording functionality
@@ -44,10 +37,9 @@ pnpm cap-setup            # Install native dependencies (FFmpeg, etc.)
 
 ### Development
 ```bash
-pnpm dev                  # Start web + desktop + Docker services
-pnpm dev:web              # Web only (starts Docker for MySQL/MinIO)
-pnpm dev:desktop          # Desktop only
-cd apps/web && pnpm dev   # Web without Docker
+pnpm dev                  # Start desktop app (via Turbo)
+pnpm dev:desktop          # Start desktop app directly
+pnpm with-env -- <cmd>    # Run any command with .env loaded
 ```
 
 ### Build & Quality
@@ -55,31 +47,24 @@ cd apps/web && pnpm dev   # Web without Docker
 pnpm build                # Build all via Turbo
 pnpm tauri:build          # Build desktop release
 pnpm lint                 # Lint with Biome
-pnpm format               # Format with Biome
+pnpm format               # Format with Biome (ALWAYS run before completing work)
 pnpm typecheck            # TypeScript check
-cargo fmt                 # Format Rust code
+cargo fmt                 # Format Rust code (ALWAYS run before completing work)
 cargo build -p <crate>    # Build specific Rust crate
 cargo test -p <crate>     # Test specific Rust crate
 ```
 
-### Database
+### Testing
 ```bash
-pnpm db:generate          # Generate Drizzle migrations
-pnpm db:push              # Push schema to MySQL
-pnpm db:studio            # Open Drizzle Studio
+cd apps/desktop && pnpm test              # Run desktop vitest tests
+cargo test -p <crate>                     # Run Rust tests for specific crate
+cargo test -p <crate> -- --nocapture      # Run with stdout visible
 ```
 
-### Docker
+### Utilities
 ```bash
-pnpm docker:up            # Start MySQL/MinIO containers
-pnpm docker:stop          # Stop containers
-pnpm docker:clean         # Remove containers and volumes
-```
-
-### Analytics (Tinybird)
-```bash
-pnpm analytics:setup      # Provision Tinybird data sources (destructive)
-pnpm analytics:check      # Validate Tinybird schema
+pnpm clean                                # Remove node_modules, .next, .output, .turbo, dist
+pnpm check-tauri-versions                 # Verify Tauri plugin version consistency
 ```
 
 ## Critical Rules
@@ -88,49 +73,65 @@ pnpm analytics:check      # Validate Tinybird schema
 - `**/tauri.ts` — IPC bindings (regenerated on app load)
 - `**/queries.ts` — Query bindings
 - `apps/desktop/src-tauri/gen/**` — Tauri generated files
+- `packages/ui-solid/src/auto-imports.d.ts` — Auto-import type definitions
 
 ### NO CODE COMMENTS
-Never add comments (`//`, `/* */`, `///`, `//!`, `#`, etc.) to any code. Code must be self-explanatory through naming, types, and structure.
+**CRITICAL**: Never add comments (`//`, `/* */`, `///`, `//!`, `#`, etc.) to any code in any language (TypeScript, JavaScript, Rust, etc.). Code must be self-explanatory through:
+- Clear, descriptive naming
+- Type annotations
+- Well-structured code organization
+
+This rule applies to all code: new files, edits to existing files, and all languages in the repository.
 
 ### Server Management
 Do not start additional dev servers unless asked. Assume the developer already has the environment running.
 
-### Database Changes
-Always run: `pnpm db:generate` → `pnpm db:push` → test
-
 ### Desktop Permissions (macOS)
 When running from terminal, grant screen/mic permissions to the terminal app, not the Inflight app.
+
+### Code Formatting
+**ALWAYS format code before completing work:**
+- Run `pnpm format` for TypeScript/JavaScript after any edits
+- Run `cargo fmt` for Rust after any edits
+- These commands should be run regularly during development and always at the end of a coding session
 
 ## Architecture Patterns
 
 ### Technology Stack
-- **Package Manager**: pnpm 10.5.2
+- **Package Manager**: pnpm 10.30.3
 - **Node**: 20+
 - **Rust**: 1.88+
 - **Build**: Turborepo
-- **Frontend (Web)**: React 19 + Next.js 15 (App Router)
 - **Desktop**: Tauri v2, SolidStart, Solid.js
-- **Database**: MySQL (PlanetScale) with Drizzle ORM
-- **Storage**: S3-compatible (AWS, Cloudflare R2, MinIO for local)
-- **AI**: Groq (primary) + OpenAI (fallback) — Server Actions only
+- **UI**: `@inflight/ui-solid` (SolidJS + Kobalte + TailwindCSS)
+- **Testing**: Vitest (for TypeScript/JavaScript), Cargo test (for Rust)
+- **Linting/Formatting**: Biome (TS/JS), rustfmt (Rust)
 
-### Server Actions (Web)
-```typescript
-"use server";
+### Desktop Architecture
+The desktop app follows a clear separation:
+- **Frontend** (`apps/desktop/src/`):
+  - SolidStart routes in `routes/`
+  - Shared components in `components/`
+  - State management stores in `store/` (minimal usage)
+  - Auto-generated Tauri IPC bindings in `utils/tauri.ts`
+- **Backend** (`apps/desktop/src-tauri/src/`):
+  - Each module (e.g., `recording.rs`, `camera.rs`, `export.rs`) handles specific functionality
+  - Commands are exposed via `#[tauri::command]` and automatically typed via specta
+  - Events are defined with `#[derive(tauri_specta::Event)]` and emitted to frontend
 
-import { db } from "@inflight/database";
-import { getCurrentUser } from "@inflight/database/auth/session";
-import { videos } from "@inflight/database/schema";
+### Desktop IPC (Tauri + specta)
+Commands and events are type-safe via specta. The `tauri.ts` file is auto-generated on app load.
 
-export async function updateVideo(videoId: string, title: string) {
-  const user = await getCurrentUser();
-  if (!user?.id) throw new Error("Unauthorized");
-  return await db().update(videos).set({ name: title }).where(eq(videos.id, videoId));
+Rust command:
+```rust
+#[tauri::command]
+#[specta::specta]
+async fn start_recording(app: AppHandle, options: RecordingOptions) -> Result<(), String> {
+    // implementation
 }
 ```
 
-### Desktop IPC (Tauri + specta)
-Rust emit:
+Rust event emit:
 ```rust
 #[derive(Serialize, Type, tauri_specta::Event, Debug, Clone)]
 pub struct UploadProgress { progress: f64, message: String }
@@ -139,65 +140,62 @@ UploadProgress { progress: 0.5, message: "Uploading...".to_string() }
   .emit(&app).ok();
 ```
 
-Frontend listen (auto-generated):
+Frontend usage (auto-generated bindings):
 ```typescript
-import { events, commands } from "./tauri";
+import { events, commands } from "~/utils/tauri";
+
 await commands.startRecording({ ... });
+
 await events.uploadProgress.listen((event) => {
   setProgress(event.payload.progress);
 });
 ```
 
-### Effect System (API Routes)
-API routes use `@effect/platform`'s `HttpApi` pattern. The main handler in `apps/web/app/api/[[...route]]/route.ts`:
-```typescript
-import { HttpApiScalar } from "@effect/platform";
-import { HttpLive } from "@inflight/web-backend";
-import { Layer } from "effect";
-import { apiToHandler } from "@/lib/server";
-
-const handler = apiToHandler(
-  HttpApiScalar.layer({ path: "/api" }).pipe(Layer.provideMerge(HttpLive)),
-);
-export const GET = handler;
-export const POST = handler;
-```
-
-Backend services are in `packages/web-backend/src/` organized by domain (Videos, Users, S3Buckets, etc.).
-Run server effects through `runPromise` from `apps/web/lib/server.ts`.
-
-### React Query Pattern
-```typescript
-const { data, isLoading } = useQuery({
-  queryKey: ["videos", userId],
-  queryFn: () => getUserVideos(),
-  staleTime: 5 * 60 * 1000,
-});
-```
-
-## Important File Patterns
-
-- `apps/web/actions/**/*.ts` — Server Actions ("use server")
-- `packages/database/schema.ts` — Database schema
-- `apps/web/app/api/*` — API routes (Effect-based)
-- `packages/web-backend/src/` — Backend services (Videos, Users, S3Buckets, Folders, etc.)
-- `packages/web-domain/` — Shared domain types
-- `apps/web/lib/server.ts` — Effect runtime and `apiToHandler` utility
-
 ## Conventions
 
-- **Directory naming**: lower-case-dashed
+### Naming
+- **Files**: kebab-case (`user-menu.tsx`, `recording-settings.rs`)
+- **Directories**: kebab-case
 - **Components**: PascalCase
-- **Hooks**: camelCase starting with `use`
 - **Rust modules**: snake_case
 - **Rust crates**: kebab-case
-- **Files**: kebab-case (`user-menu.tsx`)
-- Strict TypeScript; avoid `any`
-- Use Biome for TS/JS; rustfmt for Rust
+
+### Code Style
+- **TypeScript/JavaScript**:
+  - Indentation: Tabs (configured in Biome)
+  - Quotes: Double quotes (configured in Biome)
+  - Strict TypeScript; avoid `any`
+  - Import organization: Auto-organized by Biome
+- **Rust**:
+  - Follow workspace lints defined in root `Cargo.toml`
+  - Key enforced lints: `unused_must_use = "deny"`, `dbg_macro = "deny"`, `let_underscore_future = "deny"`
+  - Use `rustfmt` for formatting
+
+## Common Workflows
+
+### Adding a new Tauri command
+1. Define command in appropriate module in `apps/desktop/src-tauri/src/`
+2. Add `#[tauri::command]` and `#[specta::specta]` attributes
+3. Register command in `lib.rs` (if new module)
+4. Restart dev server to regenerate `tauri.ts` bindings
+5. Import and use from `~/utils/tauri` in frontend
+
+### Adding a new Tauri event
+1. Define event struct with `#[derive(Serialize, Type, tauri_specta::Event, Debug, Clone)]`
+2. Emit via `.emit(&app)` in Rust code
+3. Restart dev server to regenerate `tauri.ts` bindings
+4. Listen via `events.yourEvent.listen()` in frontend
+
+### Working with Rust crates
+1. Make changes to crate code in `crates/<crate-name>/`
+2. Test with `cargo test -p <crate-name>`
+3. Format with `cargo fmt`
+4. Build desktop app to verify integration: `pnpm dev:desktop`
 
 ## Troubleshooting
 
-- **Turbo cache issues**: `rm -rf .turbo`
+- **Turbo cache issues**: `pnpm clean` or `rm -rf .turbo`
 - **IPC binding errors**: Restart dev server to regenerate `tauri.ts`
 - **Node version**: Must be 20+
-- **Clean rebuild**: `pnpm clean`
+- **Clean rebuild**: `pnpm clean` removes all build artifacts and node_modules
+- **Format on save not working**: Run `pnpm format` and `cargo fmt` manually before commits

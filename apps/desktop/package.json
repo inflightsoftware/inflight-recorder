@@ -11,9 +11,7 @@
 	},
 	"dependencies": {
 		"@aerofoil/rive-solid-canvas": "^2.1.4",
-		"@inflight/database": "workspace:*",
 		"@inflight/ui-solid": "workspace:*",
-		"@inflight/utils": "workspace:*",
 		"@inflight/web-api-contract": "workspace:*",
 		"@corvu/tooltip": "^0.2.1",
 		"@intercom/messenger-js-sdk": "^0.0.14",
